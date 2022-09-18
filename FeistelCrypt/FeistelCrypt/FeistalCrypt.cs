@@ -71,5 +71,16 @@ finally
 {
     Console.Read();
 }
+/*
+ * Number to crypt (<65535): 21345
+Round 1: 5879
+Round 2: 32565
+Round 3: 21347
+Round 4: 13857
+Round 5: 4676
+Round 6: 17504
+Round 7: 1590
+Round 8: 25460
+ */
 
 
