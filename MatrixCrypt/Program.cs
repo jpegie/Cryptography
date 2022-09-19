@@ -1,8 +1,11 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
-using System.ComponentModel;
 
-var kMatrix = DenseMatrix.OfArray(new [,] { { 2.0, 1.0 }, { 9.0, 3.0 } });
+var kMatrix = DenseMatrix.OfArray(new [,] 
+{ 
+    { 2.0, 1.0 },
+    { 9.0, 3.0 } 
+});
 
 string Enrypt(string str)
 {
@@ -75,9 +78,9 @@ Matrix<double> GetMatrixForDecrypt()
 
     kMatrixInversed *= modularInversedDet;
 
-    for (int i=0;i<2; ++i)
+    for (int i = 0; i < 2; ++i)
     {
-        for(int j=0;j<2 ; ++j)
+        for(int j = 0; j < 2; ++j)
         {
             if (kMatrixInversed[i,j] < 0)
             {
