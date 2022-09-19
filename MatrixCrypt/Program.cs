@@ -64,7 +64,14 @@ Matrix<double> GetMatrixForDecrypt()
     var kMatrixInversed = kMatrix.Inverse();
     kMatrixInversed.Multiply(kMatrixDet, kMatrixInversed);
 
-    var modularInversedDet = GetModularInversedNumber((int)kMatrixDet, 256);
+    /*
+     * 1. Находим матрицу алгебраических дополнений
+     * 2. Находим детерминант исходной матрицы
+     * 3. Умножаем 1/det на матрицу п.1
+     * 4. 1/det = x (mod p) -> 1 = x*det (mod p) -> нужно найти обратное по модулю p для det
+     */
+
+    var modularInversedDet = GetModularInversedNumber((int)kMatrixDet, 256); 
 
     kMatrixInversed *= modularInversedDet;
 
