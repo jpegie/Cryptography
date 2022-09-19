@@ -1,5 +1,6 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
+using System.ComponentModel;
 
 var kMatrix = DenseMatrix.OfArray(new [,] { { 2.0, 1.0 }, { 9.0, 3.0 } });
 
@@ -63,14 +64,14 @@ Matrix<double> GetMatrixForDecrypt()
     var kMatrixInversed = kMatrix.Inverse();
     kMatrixInversed.Multiply(kMatrixDet, kMatrixInversed);
 
-    int x, y;
-    GCD((int)kMatrixDet, 256, out x, out y);
+    var modularInversedDet = GetModularInversedNumber((int)kMatrixDet, 256);
+
+    kMatrixInversed *= modularInversedDet;
 
     for (int i=0;i<2; ++i)
     {
         for(int j=0;j<2 ; ++j)
         {
-            kMatrixInversed[i,j] *= x;
             if (kMatrixInversed[i,j] < 0)
             {
                 kMatrixInversed[i, j] = (uint)Math.Floor(kMatrixInversed[i, j]) % 256;
@@ -82,6 +83,17 @@ Matrix<double> GetMatrixForDecrypt()
         }
     }
     return kMatrixInversed;
+}
+
+int GetModularInversedNumber(int number, int module)
+{
+    int x, y;
+    int d = GCD(number, module, out x, out y);
+    if (d != 1)
+    {
+        throw new Exception("Нет решения, т.к. НОД != 1!");
+    }
+    return x;
 }
 
 int GCD(int a, int b, out int x, out int y)
