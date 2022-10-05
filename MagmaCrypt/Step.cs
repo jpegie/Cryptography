@@ -13,9 +13,9 @@ public class Step
     {
         var bytes = new List<byte>();
         var cryptedFragments = BitConverter.GetBytes(CryptFragment()).ToArray();
-        foreach (var b in cryptedFragments)
+        foreach (var fragment in cryptedFragments)
         {
-            bytes.Add(b);
+            bytes.Add(fragment);
         }
         return bytes;
     }

@@ -25,5 +25,8 @@ public class Program
         var decrypted = magma.Crypt(true);
         var decryptedStr = Encoding.Default.GetString(decrypted.ToArray());
         Console.WriteLine($"D: {decryptedStr}");
+
+        File.WriteAllText("result.txt", $"{inputStr} : {encryptedStr}");
+
     }
 }
