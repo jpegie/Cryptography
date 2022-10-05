@@ -1,4 +1,4 @@
-﻿const UInt16 KEY = 42098; //1010010001110010
+﻿const UInt16 KEY = 65100; //1010010001110010
 
 UInt16 Crypt(UInt16 number, UInt16 key, int rounds)
 {
