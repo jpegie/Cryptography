@@ -1,4 +1,6 @@
-﻿namespace Magma;
+﻿using System.Text;
+
+namespace Magma;
 
 public class Step
 {
@@ -33,42 +35,47 @@ public class Step
 
         for (int round = 0; round < totalRounds; ++round)
         {
-            prevRight = right;
-
-            right = (UInt32)((right + _keys.ElementAt(round)) % (Convert.ToUInt64(Math.Pow(2, 32))));
-            right = GetNewRight(right, left);
-
-            if (round == totalRounds - 1)
-            {
-                left = right;
-                right = prevRight;
-            }
-            else
-            {
-                left = prevRight;
-            }
+            DoRound(round, round == totalRounds - 1, ref left, ref right);
         }
         encryptedResult = ((ulong)right) << 32 | (ulong)left;
 
         return encryptedResult;
     }
+    private void DoRound(int round_i, bool isLastRound, ref uint left, ref uint right)
+    {
+        var prevRight = right;
+        right = (UInt32)((right + _keys.ElementAt(round_i)) % (Convert.ToUInt64(Math.Pow(2, 32))));
+        right = GetNewRight(right, left);
+
+        if (isLastRound)
+        {
+            left = right;
+            right = prevRight;
+        }
+        else
+        {
+            left = prevRight;
+        }
+    }
 
     private uint GetNewRight(uint right, uint left)
     {
-        var tRight = 0u;
-        var totalParts = 8;
-        var bitsInPart = 4; 
-        var baseShift = 28; 
+        var newRight = 0u;
+        int totalParts = 8,
+            bitsInPart = 4,
+            baseShift = 28; 
 
         for (int i = 0; i < totalParts; ++i)
         {
             var part = (right << bitsInPart * i) >> baseShift; //0000000000000000000000000000XXXX 
-            var tPart = ReplacementTable.T[i, part];
-            tRight |= (UInt32)(tPart << (baseShift - i * bitsInPart));
+            var replacesPart = ReplacementTable.T[i, part];
+            newRight |= (UInt32)(replacesPart << (baseShift - i * bitsInPart));
         }
 
-        tRight = (tRight << 11) | (tRight >> 21);
-        return tRight ^ left;
+        newRight = (newRight << 11) | (newRight >> 21);
+        newRight ^= left;
+
+        return newRight;
     }
 
 
