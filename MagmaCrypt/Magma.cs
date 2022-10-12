@@ -1,5 +1,7 @@
-﻿using System.Text;
+﻿using MagmaCrypt;
+using System.Text;
 namespace Magma;
+
 public class MagmaCrypt
 {
     private static int _blockLenghtBytes = 8;
@@ -18,26 +20,53 @@ public class MagmaCrypt
     }
     public List<byte> Crypt(bool decrypt = false)
     {
+        Console.WriteLine((decrypt ? "Decrypting" : "Encrypting") + " started");
         FillGapInData();
-        var crypted = new List<byte>();
+        var fragments = new List<Fragment>();
         var keys = decrypt ? GetKeys().Reverse() : GetKeys();
-        var fragments = SplitDataToFragments();
+        var ulongFragments = SplitDataToFragments();
+        var fragmentsCryptingTasks = new List<Task>();
+        var cryptedFragmentsLock = new object();
+        var fragmentsCount = ulongFragments.Count();
+        var steps = new List<Step>();
 
-        foreach (var fragment in fragments)
+
+        for (int i = 0; i < fragmentsCount; i++)
         {
-            var step = new Step(fragment, keys);
-            var cryptedFragmentBytes = step.Crypt();
-            crypted.AddRange(cryptedFragmentBytes);
+            var step = new Step(ulongFragments.ElementAt(i), keys, i);
+            steps.Add(step);
         }
-        return crypted;
-    }
+        int k = 0;
+        steps.ForEach(step => fragmentsCryptingTasks.Add(
+            new Task(() => 
+            { 
+                step.Crypt();
+                Console.WriteLine($"{k++} / {fragmentsCount}");
+            })));
 
+        fragmentsCryptingTasks.ForEach(task => task.Start());
+
+        Task.WaitAll(fragmentsCryptingTasks.ToArray());
+        steps = steps.OrderBy(step => step.Index).ToList();
+
+        if (decrypt)
+        {
+            RemoveGapBytes(steps);
+        }
+        Console.WriteLine((decrypt ? "Decrypting" : "Encrypting") + " finished");
+        return steps.SelectMany(step => step.CryptedData).ToList();
+        
+    }
+    private void RemoveGapBytes(List<Step> steps)
+    {
+        steps[0].CryptedData.RemoveRange(0, steps[0].CryptedData.FindIndex(b => b != 0x00));
+    }
     private void FillGapInData()
     {
         if (_data.Count % 8 != 0)
         {
-            var amountBytesToAdd = 8 * (_data.Count / 8 + 1) - _data.Count;
-            _data.InsertRange(0, Enumerable.Repeat<byte>(0x00, amountBytesToAdd));
+            var gapCount = 8 * (_data.Count / 8 + 1) - _data.Count;
+            _data.InsertRange(0, Enumerable.Repeat<byte>(0x00, gapCount));
         }
     }
     

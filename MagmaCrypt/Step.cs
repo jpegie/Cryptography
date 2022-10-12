@@ -1,17 +1,20 @@
-﻿using System.Text;
-
-namespace Magma;
+﻿namespace Magma;
 
 public class Step
 {
     ulong _data;
+    int _index;
     IEnumerable<uint> _keys;
-    public Step(ulong dataFragment, IEnumerable<uint>keys)
+    List<byte> _cryptedData;
+    public Step(ulong dataFragment, IEnumerable<uint>keys, int index)
     {
         _data = dataFragment;
         _keys = keys;
+        _index = index; 
     }
-    public IEnumerable<byte> Crypt()
+    public int Index => _index;
+    public List<byte> CryptedData => _cryptedData;
+    public void Crypt()
     {
         var bytes = new List<byte>();
         var cryptedFragments = BitConverter.GetBytes(CryptFragment()).ToArray();
@@ -19,7 +22,7 @@ public class Step
         {
             bytes.Add(fragment);
         }
-        return bytes;
+        _cryptedData = bytes;
     }
 
     private ulong CryptFragment()
