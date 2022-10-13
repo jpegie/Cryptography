@@ -1,68 +1,61 @@
-﻿using MagmaCrypt;
+﻿using System.Diagnostics;
 using System.Text;
 namespace Magma;
 
 public class MagmaCrypt
 {
-    private static int _blockLenghtBytes = 8;
-    private static byte[] _key;
+    Stopwatch _stopwatch;
+    private List<byte> _key;
     private List<byte> _data;
 
-    public MagmaCrypt(IEnumerable<byte> data, string key)
+    public MagmaCrypt(string key)
     {
         if (key.Length != 32)
         {
             throw new Exception("KEY MUST BE 32 CHARS LENGTH");
         }
-
-        _data = data.ToList<byte>();
-        _key = Encoding.Default.GetBytes(key).ToArray();
+        _stopwatch = new Stopwatch();   
+        _key = Encoding.Default.GetBytes(key).ToList();
     }
-    public List<byte> Crypt(bool decrypt = false)
+    public IEnumerable<byte> Crypt(IEnumerable<byte> data, bool decrypt = false)
     {
+        _stopwatch.Start();
         Console.WriteLine((decrypt ? "Decrypting" : "Encrypting") + " started");
-        FillGapInData();
+        
+        FillGapInData(data);
+
+        var keys = GetRoundsKeys(decrypt);
+        var splittedData = SplitDataToFragments();
+        var cryptingTasks = new List<Task>();
         var fragments = new List<Fragment>();
-        var keys = decrypt ? GetKeys().Reverse() : GetKeys();
-        var ulongFragments = SplitDataToFragments();
-        var fragmentsCryptingTasks = new List<Task>();
-        var cryptedFragmentsLock = new object();
-        var fragmentsCount = ulongFragments.Count();
-        var steps = new List<Step>();
 
-
-        for (int i = 0; i < fragmentsCount; i++)
+        for (int i = 0; i < splittedData.Count(); i++)
         {
-            var step = new Step(ulongFragments.ElementAt(i), keys, i);
-            steps.Add(step);
+            fragments.Add(new Fragment(splittedData[i], keys, i));
         }
-        int k = 0;
-        steps.ForEach(step => fragmentsCryptingTasks.Add(
-            new Task(() => 
-            { 
-                step.Crypt();
-                Console.WriteLine($"{k++} / {fragmentsCount}");
-            })));
 
-        fragmentsCryptingTasks.ForEach(task => task.Start());
+        fragments.ForEach(f => cryptingTasks.Add(new Task(f.Crypt)));
+        cryptingTasks.ForEach(task => task.Start());
 
-        Task.WaitAll(fragmentsCryptingTasks.ToArray());
-        steps = steps.OrderBy(step => step.Index).ToList();
+        Task.WaitAll(cryptingTasks.ToArray());
+        fragments = fragments.OrderBy(f => f.Index).ToList();
 
         if (decrypt)
         {
-            RemoveGapBytes(steps);
+            RemoveGapBytes(fragments);
         }
-        Console.WriteLine((decrypt ? "Decrypting" : "Encrypting") + " finished");
-        return steps.SelectMany(step => step.CryptedData).ToList();
+        _stopwatch.Stop();
+        Console.WriteLine((decrypt ? "Decrypting" : "Encrypting" + $"finished in {_stopwatch.Elapsed.ToString()}"));
+        return fragments.SelectMany(f => f.CryptedData).ToList();
         
     }
-    private void RemoveGapBytes(List<Step> steps)
+    private void RemoveGapBytes(List<Fragment> fragments)
     {
-        steps[0].CryptedData.RemoveRange(0, steps[0].CryptedData.FindIndex(b => b != 0x00));
+        fragments[0].CryptedData.RemoveRange(0, fragments[0].CryptedData.FindIndex(b => b != 0x00));
     }
-    private void FillGapInData()
+    private void FillGapInData(IEnumerable<byte> data)
     {
+        _data = data.ToList();
         if (_data.Count % 8 != 0)
         {
             var gapCount = 8 * (_data.Count / 8 + 1) - _data.Count;
@@ -70,66 +63,47 @@ public class MagmaCrypt
         }
     }
     
-    private IEnumerable<uint> GetKeys()
+    private List<uint> GetRoundsKeys(bool decrypt)
     {
-        int totalParts = 4,
-            lastPart = 3,
-            keyBytesCapacity = 4,
-            keysInPart = 8;
+        const int setsInFinalKeys = 4,
+            lastSet = 3,
+            bytesInKey = 4,
+            keysInSet = 8;
 
-        var setOfKeys = new List<uint>();
-        var keys = new List<uint>();
+        var keysSet = new List<uint>();
+        var finalKeys = new List<uint>();
 
-        for (int i = 0; i < keysInPart; ++i)
+        for (int i = 0; i < keysInSet; ++i)
         {
-            setOfKeys.Add(
-                BitConverter.ToUInt32(
-                _key
-                .Skip(i * keyBytesCapacity)
-                .Take(keyBytesCapacity)
-                .ToArray()));
+            keysSet.Add(BitConverter.ToUInt32(
+                _key.GetRange(i * bytesInKey, bytesInKey).ToArray()));
         }
-        for (int i = 0; i < totalParts; ++i)
+        for (int i = 0; i < setsInFinalKeys; ++i)
         {
-            if (i == lastPart)
+            if (i == lastSet)
             {
-                setOfKeys.Reverse();
+                keysSet.Reverse();
             }
-            keys.AddRange(setOfKeys);
+            finalKeys.AddRange(keysSet);
         }
-        return keys;
+        if (decrypt)
+        {
+            finalKeys.Reverse();
+        }
+        return finalKeys;
     }
 
-    private IEnumerable<ulong> SplitDataToFragments()
+    private ulong [] SplitDataToFragments()
     {
-        int blocksAmount = _data.Count / _blockLenghtBytes;
-        if (_data.Count % _blockLenghtBytes != 0)
+        const int bytesInFragment = 8;
+        var fragmentsAmount = _data.Count / bytesInFragment;
+        var fragments = new ulong[fragmentsAmount];
+        for (int i = 0; i < fragmentsAmount; ++i)
         {
-            blocksAmount++;
+            var fragment = _data.GetRange(i * bytesInFragment, bytesInFragment);
+            fragments[i] = BitConverter.ToUInt64(fragment.ToArray());
         }
-        List<ulong> blocks = new List<ulong>();
-        for (int i = 0; i < blocksAmount; ++i)
-        {
-            var takeAmount = 8;
-
-            if (i + 1 == blocksAmount)
-            {
-                if (_data.Count % _blockLenghtBytes != 0)
-                {
-                    takeAmount = _data.Count % _blockLenghtBytes;
-                }
-            }
-            takeAmount = 8;
-            var blockBytes = _data.Skip(i * 8).Take(takeAmount).ToList();
-
-            if (takeAmount != 8)
-            {
-                blockBytes.InsertRange(0, Enumerable.Repeat<byte>(0x00, 8 - takeAmount).ToArray());
-            }
-
-            blocks.Add(BitConverter.ToUInt64(blockBytes.ToArray()));
-        }
-        return blocks;
+        return fragments;
     }
 }
 
