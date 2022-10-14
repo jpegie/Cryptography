@@ -45,7 +45,7 @@ public class MagmaCrypt
             RemoveGapBytes(fragments);
         }
         _stopwatch.Stop();
-        Console.WriteLine((decrypt ? "Decrypting" : "Encrypting" + $"finished in {_stopwatch.Elapsed.ToString()}"));
+        Console.WriteLine((decrypt ? "Decrypting" : "Encrypting") + $"finished in {_stopwatch.Elapsed.ToString()}");
         return fragments.SelectMany(f => f.CryptedData).ToList();
         
     }

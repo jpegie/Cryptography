@@ -75,7 +75,7 @@ public class Fragment
             newRight |= (UInt32)(replacesPart << (baseShift - i * bitsInPart));
         }
 
-        return (newRight << 11) ^ left;
+        return ((newRight << 11) | (newRight >> 21)) ^ left;
     }
 
 
