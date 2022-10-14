@@ -24,34 +24,34 @@ public class MagmaCrypt
         
         FillGapInData(data);
 
-        var keys = GetRoundsKeys(decrypt);
-        var splittedData = SplitDataToFragments();
-        var cryptingTasks = new List<Task>();
-        var fragments = new List<Fragment>();
+        var keys = GetRoundsKeys(decrypt); 
+        var splittedData = SplitDataToBlocks(); //делим файл на блоки по 64 бита
+        var cryptingTasks = new List<Task>(); 
+        var blocks = new List<Block>();
 
         for (int i = 0; i < splittedData.Count(); i++)
         {
-            fragments.Add(new Fragment(splittedData[i], keys, i));
+            blocks.Add(new Block(splittedData[i], keys, i));
         }
 
-        fragments.ForEach(f => cryptingTasks.Add(new Task(f.Crypt)));
+        blocks.ForEach(b => cryptingTasks.Add(new Task(b.Crypt)));
         cryptingTasks.ForEach(task => task.Start());
 
         Task.WaitAll(cryptingTasks.ToArray());
-        fragments = fragments.OrderBy(f => f.Index).ToList();
+        blocks = blocks.OrderBy(b => b.Index).ToList();
 
         if (decrypt)
         {
-            RemoveGapBytes(fragments);
+            RemoveGapBytes(blocks);
         }
         _stopwatch.Stop();
         Console.WriteLine((decrypt ? "Decrypting" : "Encrypting") + $"finished in {_stopwatch.Elapsed.ToString()}");
-        return fragments.SelectMany(f => f.CryptedData).ToList();
+        return blocks.SelectMany(b => b.CryptedData).ToList();
         
     }
-    private void RemoveGapBytes(List<Fragment> fragments)
+    private void RemoveGapBytes(List<Block> blocks)
     {
-        fragments[0].CryptedData.RemoveRange(0, fragments[0].CryptedData.FindIndex(b => b != 0x00));
+        blocks[0].CryptedData.RemoveRange(0, blocks[0].CryptedData.FindIndex(b => b != 0x00));
     }
     private void FillGapInData(IEnumerable<byte> data)
     {
@@ -93,17 +93,17 @@ public class MagmaCrypt
         return finalKeys;
     }
 
-    private ulong [] SplitDataToFragments()
+    private ulong [] SplitDataToBlocks()
     {
-        const int bytesInFragment = 8;
-        var fragmentsAmount = _data.Count / bytesInFragment;
-        var fragments = new ulong[fragmentsAmount];
-        for (int i = 0; i < fragmentsAmount; ++i)
+        const int bytesInBlock = 8;
+        var blocksAmount = _data.Count / bytesInBlock;
+        var blocks = new ulong[blocksAmount];
+        for (int i = 0; i < blocksAmount; ++i)
         {
-            var fragment = _data.GetRange(i * bytesInFragment, bytesInFragment);
-            fragments[i] = BitConverter.ToUInt64(fragment.ToArray());
+            var block = _data.GetRange(i * bytesInBlock, bytesInBlock);
+            blocks[i] = BitConverter.ToUInt64(block.ToArray());
         }
-        return fragments;
+        return blocks;
     }
 }
 

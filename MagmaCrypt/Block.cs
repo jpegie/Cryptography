@@ -1,14 +1,14 @@
 ﻿namespace Magma;
 
-public class Fragment
+public class Block
 {
     ulong _data;
     int _index;
     List<uint> _keys;
     List<byte> _cryptedData;
-    public Fragment(ulong dataFragment, List<uint>keys, int index)
+    public Block(ulong data, List<uint>keys, int index)
     {
-        _data = dataFragment;
+        _data = data;
         _keys = keys;
         _index = index; 
     }
@@ -17,7 +17,7 @@ public class Fragment
     public void Crypt()
     {
         var bytes = new List<byte>();
-        var cryptedFragments = BitConverter.GetBytes(CryptFragment()).ToArray();
+        var cryptedFragments = BitConverter.GetBytes(CryptBlock()).ToArray();
         foreach (var fragment in cryptedFragments)
         {
             bytes.Add(fragment);
@@ -25,29 +25,26 @@ public class Fragment
         _cryptedData = bytes;
     }
 
-    private ulong CryptFragment()
+    private ulong CryptBlock()
     {
+        const int totalIterations = 32;
         ulong encryptedResult = 0u;
-
-        var totalRounds = 32;
 
         var right = (uint)(_data >> 32);
         var left = (uint)((_data << 32) >> 32);
 
-        var prevRight = right;
-
-        for (int round = 0; round < totalRounds; ++round)
+        for (int round = 0; round < totalIterations; ++round)
         {
-            DoRound(round, round == totalRounds - 1, ref left, ref right);
+            DoIteration(round, round == totalIterations - 1, ref left, ref right);
         }
         encryptedResult = ((ulong)right) << 32 | (ulong)left;
 
         return encryptedResult;
     }
-    private void DoRound(int round_i, bool isLastRound, ref uint left, ref uint right)
+    private void DoIteration(int round_i, bool isLastRound, ref uint left, ref uint right)
     {
         var prevRight = right;
-        right = (UInt32)((right + _keys.ElementAt(round_i)) % (Convert.ToUInt64(Math.Pow(2, 32))));
+        right = (UInt32)((right + _keys.ElementAt(round_i)));// % (Convert.ToUInt64(Math.Pow(2, 32))));
         right = GetNewRight(right, left);
 
         if (isLastRound)
@@ -64,9 +61,9 @@ public class Fragment
     private uint GetNewRight(uint right, uint left)
     {
         var newRight = 0u;
-        int totalParts = 8,
-            bitsInPart = 4,
-            baseShift = 28; 
+        const int totalParts = 8,
+                  bitsInPart = 4,
+                  baseShift = 28; 
 
         for (int i = 0; i < totalParts; ++i)
         {
@@ -77,7 +74,4 @@ public class Fragment
 
         return ((newRight << 11) | (newRight >> 21)) ^ left;
     }
-
-
-
 }
