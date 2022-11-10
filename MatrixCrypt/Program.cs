@@ -60,7 +60,6 @@ int [,] GetTransposedKMatrix()
 
 string Decrypt(string str)
 {
-   
     var decryptingMatrix = GetMatrixForDecrypt();
     var couples = MakeCouples(str);
     var decryptedStr = "";
@@ -86,7 +85,15 @@ int [,] GetMatrixForDecrypt()
     inversedMatrix[0, 1] = -kMatrixTransposed[1, 0];
     inversedMatrix[1, 0] = -kMatrixTransposed[0, 1];
     inversedMatrix[1, 1] = kMatrixTransposed[0, 0];
-    
+
+    /*
+     * 1. Находим матрицу алгебраических дополнений
+     * 2. Находим детерминант исходной матрицы
+     * 3. Умножаем 1/det на матрицу п.1 <- это переменная x
+     * 4. 1/det = x (mod p) -> 1 = x*det (mod p) -> нужно найти обратное по модулю p для det
+        
+     */
+
     int x, y;
     Gcd(kMatrixDet, 256, out x, out y);
 
