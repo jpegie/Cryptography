@@ -1,6 +1,6 @@
 ﻿using EllipticCurves;
 
-const string _alphabetSymbols = "qwertyuiopasdfghjklzxcvbnm1234567890!@#$%";
+const string _alphabetSymbols = "qwertyuiopasdfghjklzxcvbnm1234567890!@ ";
 const int _module = 41;
 const int _a = 1;
 const int _bobHiddenKey = 77;
@@ -26,8 +26,8 @@ while (answer != "5")
     "What wanna do?\n" +
     "|_ 0 : enter Bob's openned key\n" +
     "|_ 1 : enter Alice's 'k'\n" +
-    "|_ 2 : encrypt (for Bob)\n" +
-    "|_ 3 : decrypt (for Alice)\n" +
+    "|_ 2 : encrypt (for Alice)\n" +
+    "|_ 3 : decrypt (for Bob)\n" +
     "|_ 4 : print openned keys\n" +
     "|_ 5 : exit");
     Console.Write("Input: ");
@@ -39,7 +39,7 @@ while (answer != "5")
         for(int i = 0; i < curvePoints.Count; ++i)
         {
             if (i % 5 == 0 && i != 0) Console.WriteLine();
-            Console.Write($"{i}. [{curvePoints[i].X}; {curvePoints[i].Y}]\t");
+            Console.Write($"{i}. [{curvePoints[i].X}; {curvePoints[i].Y}]\t({EllipticPointsOperations.GetPointOrder(curvePoints[i])})\t");
         }
 
         Console.Write("\nIndex of point: ");
@@ -82,11 +82,17 @@ while (answer != "5")
         Console.Write("Text to encrypt: ");
         strToEncrypt = Console.ReadLine();
         encryptParam.BobG = _bobG;
-        encryptParam.InputStr = strToEncrypt;
+        encryptParam.StringToEncrypt = strToEncrypt;
         encryptParam.AliceK = _aliceK;
         encryptParam.BobOpennedKey = _bobOpennedKey;
         encryptedStr = new EllipticCurveEcnrypter().Crypt(encryptParam);
-        Console.WriteLine($"Encrypted string: {encryptedStr}");
+
+        Console.BackgroundColor = ConsoleColor.Green;
+        Console.ForegroundColor = ConsoleColor.Black;
+        Console.Write($"Encrypted string: {encryptedStr}");
+        Console.BackgroundColor = ConsoleColor.Black;
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine();
     }
     if (answer == "3")
     {
@@ -100,14 +106,19 @@ while (answer != "5")
             Console.WriteLine("Do step '0' before decrypting");
             continue;
         }
-        Console.WriteLine("Text to decrypt: ");
+        Console.Write("Text to decrypt: ");
         strToDecrypt = Console.ReadLine();
         decryptParam.BobHiddenKey = _bobHiddenKey;
-        decryptParam.AliceK = _aliceK;
+        //decryptParam.AliceK = _aliceK;
         decryptParam.EncryptedString = encryptedStr;
         decryptParam.EncryptedString = strToDecrypt;
         decryptedStr = new EllipticCurveDecrypter().Decrypt(decryptParam);
-        Console.WriteLine($"Decrypted string: {decryptedStr}");
+        Console.BackgroundColor = ConsoleColor.Green;
+        Console.ForegroundColor = ConsoleColor.Black;
+        Console.Write($"Decrypted string: {decryptedStr}");
+        Console.BackgroundColor = ConsoleColor.Black;
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine();
     }
     if (answer == "4")
     {
@@ -117,7 +128,7 @@ while (answer != "5")
             $"Bob openned key: [{_bobOpennedKey.X};{_bobOpennedKey.Y}]");
         continue;
     }
-    Console.WriteLine("\n" + new String('-', 25) + "\n");
+    Console.WriteLine("#");
 }
 
 void FillAlphabet()

@@ -5,5 +5,5 @@ public class EnryptParameters
     public EllipticPoint BobOpennedKey { get; set; }
     public EllipticPoint BobG { get; set; }
     public Dictionary<char, EllipticPoint> Alphabet { get; set; }
-    public string InputStr { get; set; }
+    public string StringToEncrypt { get; set; }
 }
