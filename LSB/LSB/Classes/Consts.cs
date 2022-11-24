@@ -9,5 +9,6 @@ public static class Consts
 {
     public static int BytesCapacityInExtension = 10;
     public static UInt16 ModificatedBitsInByte = 2;
+    public static int SplittedPartsAmount = 8 / ModificatedBitsInByte;
 }
 
