@@ -20,6 +20,11 @@ var encryptParam = new EnryptParameters(); encryptParam.Alphabet = alphabet;
 var decryptParam = new DecryptParameters(); decryptParam.Alphabet = alphabet;   
 var answer = "-2";
 
+EllipticPointsOperations.Module = 41;
+var a = new EllipticPoint(33, 4);
+var c = new EllipticPoint(8, 20);
+var b = EllipticPointsOperations.Sum(a, c);
+
 while (answer != "5")
 {
     Console.WriteLine(

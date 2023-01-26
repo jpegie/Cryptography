@@ -3,6 +3,7 @@
 namespace LSB_;
 public static class LSBcrypter
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1416:Проверка совместимости платформы", Justification = "<Ожидание>")]
     public static Bitmap HideData(Bitmap image, IEnumerable<byte> data)
     {
         var bytes = data.ToList();
