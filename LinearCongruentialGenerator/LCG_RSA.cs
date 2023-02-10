@@ -7,8 +7,8 @@ using ScottPlot;
 namespace LinearCongruentialGenerator;
 public class LCG_RSA : ILCG
 {
-    private const int BITS_IN_GEN_NUM = 8;
-    private const int NUMBERS_TO_GEN = 10_000;
+    private const int BITS_IN_GEN_NUM = 7;
+    private int numbersToGenerate = 10_000;
     private Dictionary<int, int> _setDict;
     private BigInteger _p, _q, _n;
     private BigInteger _b;
@@ -38,12 +38,13 @@ public class LCG_RSA : ILCG
 
         if (args != null && args.Length == 3)
         {
+            numbersToGenerate = (int)args![0];
             lowerBound = (int)args![1];
             upperBound = (int)args![2];
 
         }
 
-        for (int i = 0; i < NUMBERS_TO_GEN; ++i)
+        for (int i = 0; i < numbersToGenerate; ++i)
         {
             var bitsInNewNum = new List<bool>();
 
@@ -60,6 +61,7 @@ public class LCG_RSA : ILCG
 
             if (number < lowerBound || number > upperBound)
             {
+                //i--;
                 continue;
             }
 
