@@ -1,6 +1,6 @@
 ﻿namespace kuznechik
 {
-	public class HexConverters
+	public class Converters
 	{
 		public static string ByteToHexConverter(byte[] bytes)
 		{

@@ -8,9 +8,9 @@ namespace kuznechik
 {
     public class Kuznechik
     {
-        private const int BLOCK_SIZE = 16;
-        private const int KEY_LENGTH = 32;
-        private const int ITER_KEY_LEN = KEY_LENGTH / 2;
+        private const int BLOCK_LEN = 16;
+        private const int MAIN_KEY_LEN = 32;
+        private const int ITER_KEY_LEN = MAIN_KEY_LEN / 2;
 
         private byte[] _mainKey = null;
         private byte[][] _iterKeys = null;
@@ -29,15 +29,15 @@ namespace kuznechik
 
             foreach(var bl in inputBlocks)
             {
-                var encryptedBlock = new byte[BLOCK_SIZE];
-                var temp = new byte[BLOCK_SIZE];
+                var encryptedBlock = new byte[BLOCK_LEN];
+                var temp = new byte[BLOCK_LEN];
             
-                if (bl.Length != BLOCK_SIZE)
+                if (bl.Length != BLOCK_LEN)
                 {
-                    throw new Exception($"Размер блока должен быть === {BLOCK_SIZE}");
+                    throw new Exception($"Размер блока должен быть === {BLOCK_LEN}");
                 }
 
-                Array.Copy(bl, encryptedBlock, BLOCK_SIZE);
+                Array.Copy(bl, encryptedBlock, BLOCK_LEN);
 
                 for (int i = 0; i < 10; i++)
                 {
@@ -52,13 +52,13 @@ namespace kuznechik
                      * тут нужно скопировать ключ в temp, 
                      * потому что все функции работают с входным массивом (temp) по ссылке и ничего результирующего не возвращают
                     */
-                    Array.Copy(_iterKeys[i], temp, BLOCK_SIZE); 
+                    Array.Copy(_iterKeys[i], temp, BLOCK_LEN); 
                     
                     X(temp, encryptedBlock);
                     S(temp);
                     L(temp);
 
-                    Array.Copy(temp, encryptedBlock, BLOCK_SIZE);
+                    Array.Copy(temp, encryptedBlock, BLOCK_LEN);
                 }
                 
 
@@ -74,8 +74,8 @@ namespace kuznechik
 
             foreach(var bl in inputBlocks)
             {
-                var block = new byte[BLOCK_SIZE];
-                Array.Copy(bl, block, BLOCK_SIZE);
+                var block = new byte[BLOCK_LEN];
+                Array.Copy(bl, block, BLOCK_LEN);
                 for (int i = 9; i >= 0; i--)
                 {
                     X(block, _iterKeys[i]);
@@ -120,8 +120,8 @@ namespace kuznechik
             for (int i = 0; i < 4; i++) 
             {
                 for (int j = 0; j < 8; j++)
-                { 
-                    C(c_const, iter_i);
+                {
+                    c_const[15] = (byte)iter_i; L(c_const); //нахождение константы C для генерации ключа
                     F(c_const, key0, key1);
                     iter_i++;
                 }
@@ -145,7 +145,7 @@ namespace kuznechik
 
 
             byte sum = 0; //накопительная сумма (то же, что и при умножении столбиком)
-            byte hi_bit_set;
+            byte firstBit;
             for (int i = 0; i < 8 ; i++) //многочлен представляется как 8 членов, некоторые === 1, некоторые === 0
             {
                 //здесь смотрим, если последний бит === 1, тогда умножим на него и запишем результат в sum
@@ -153,11 +153,11 @@ namespace kuznechik
                 {
                     sum ^= a; //умножение эквивалентно сумме по модулю 2, т.е. XOR
                 }
-                hi_bit_set = (byte)(a & 0x80); //a & 10000000 (128) <- запомним старший член многочлена a
+                firstBit = (byte)(a & 0x80); //a & 10000000 (128) <- запомним старший член многочлена a
                 a <<= 1; //сдвигаем a на бит влево как бы говоря, что на старший бит мы умножили и просто убираем его
-                if (hi_bit_set == 1) //если старший многочлен === 1, то вычитаем (что то же самое, что и сложение) из a многочлен 11000011
+                if (firstBit == 1) //если старший многочлен === 1, то вычитаем (что то же самое, что и сложение) из a многочлен 11000011
                 {
-                    a ^= 0xc3; /* x^8 + x^7 + x^6 + x + 1 */
+                    a ^= 0xc3; // x^8 + x^7 + x^6 + x + 1 <<< 11000011
                 }
                 b >>= 1; //умножали на младший член многочлена b, поэтому уберем его и перейдем к следующему коэффициенту
             }
@@ -201,7 +201,7 @@ namespace kuznechik
         private void F(byte [] c_const, byte[] a1, byte[] a0)
         {
             var temp = new byte[ITER_KEY_LEN];
-            Array.Copy(c_const, temp, BLOCK_SIZE);
+            Array.Copy(c_const, temp, BLOCK_LEN);
 
             X(temp, a0);
             S(temp);
@@ -223,12 +223,7 @@ namespace kuznechik
                 R(data);
             }
         }
-        private void C(byte[] c, int i)
-        {
-            Array.Clear(c, 0, ITER_KEY_LEN);
-            c[15] = (byte)i;
-            L(c);
-        }
+
         //обратное нелинейное биективное преобразование 
         private void RevS(byte[] data)
         {

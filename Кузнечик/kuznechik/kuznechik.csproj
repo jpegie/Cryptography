@@ -38,7 +38,7 @@ https://github.com/yaruson/GostPlugin</Description>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="BlockSplitter.cs" />
-    <Compile Include="HexConverters.cs" />
+    <Compile Include="Converters.cs" />
     <Compile Include="Kuznyechik.cs" />
     <Compile Include="TransformationTables.cs" />
   </ItemGroup>
