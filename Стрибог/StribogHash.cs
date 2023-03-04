@@ -1,97 +1,107 @@
 ﻿using System.Collections;
+using System.Security.Cryptography;
 
 namespace Стрибог;
 public class StribogHash
 {
     private const int BYTES_LEN_COMMON = 64;
-    private const int BYTES_LEN_IN_L = 8;
 
-    private byte[] _n = new byte[BYTES_LEN_COMMON];
-    private byte[] _sigma = new byte[BYTES_LEN_COMMON];
+    private byte[] _n = new byte[BYTES_LEN_COMMON]; //
+    private byte[] _sigma = new byte[BYTES_LEN_COMMON]; //сумма всех блоков (по 64 байта) данных по по модулю 512
     private byte[] _initVec = new byte[BYTES_LEN_COMMON];
     private int _hashLen = 256;
 
-    public StribogHash(int len = 256)
+    public StribogHash(int hashLen = 256)
     {
         for (int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
-            _n[i] = 0x00;
-            _sigma[i] = 0x00;
-            _initVec[i] = (byte)(len == 512 ? 0x00 : 0x01);
+            _initVec[i] = (byte)(hashLen == 512 ? 0x00 : 0x01);
         }
-        _hashLen = len;
+        _hashLen = hashLen;
     }
-
 
     public IEnumerable<byte> GetHash(IEnumerable<byte> data)
     {
         var dataArr = data.ToArray();
+       
+        var vec0 = new byte[BYTES_LEN_COMMON];
+        var hash = new byte[BYTES_LEN_COMMON];
+        _initVec.CopyTo(hash, 0);
 
-        var h = new byte[BYTES_LEN_COMMON]; Array.Copy(_initVec, h, BYTES_LEN_COMMON);
-
-        var n0 = Enumerable.Repeat((byte)0x00, 64).ToArray();
-
-        if (dataArr.Length >= 64)
+        if (dataArr.Length >= BYTES_LEN_COMMON) //если длина данных > 64 байтов, то надо поработать с блоками, получить необохдимые значения для хэш-функции
         {
-            dataArr = SqueezeTo512(ref h, dataArr);
+            dataArr = CutTo64(ref hash, dataArr);
         }
 
-        var dataArrBitsAmount = BitConverter.GetBytes(dataArr.Length * 8).Reverse().ToArray();
-        if (dataArr.Length < 64)
+        var dataBitsLenInBytes = BitConverter //кол-во бит в данных после сокращения
+            .GetBytes(dataArr.Length * 8)
+            .Reverse()
+            .ToArray();
+
+        if (dataArr.Length < BYTES_LEN_COMMON) //если после сокращения получилось не 64 байта, то дополним до 64
         {
-            dataArr = FillUpTo512(dataArr);
+            dataArr = FillUpTo64(dataArr);
         }
 
-        h = G(_n, h, dataArr);
-        _n = SumModulo512(_n, dataArrBitsAmount);
-        _sigma = SumModulo512(_sigma, dataArr);
-        h = G(n0, h, _n);
-        h = G(n0, h, _sigma);
+        hash = G(_n, hash, dataArr);
+        _n = SumMod512(_n, dataBitsLenInBytes);
+        _sigma = SumMod512(_sigma, dataArr);
+        hash = G(vec0, hash, _n);
+        hash = G(vec0, hash, _sigma);
 
         if (_hashLen == 512)
         {
-            return h;
+            return hash;
         }
         else
         {
             byte[] h256 = new byte[32];
-            Array.Copy(h, 0, h256, 0, 32);
+            Array.Copy(hash, 0, h256, 0, 32);
             return h256;
         }
     }
 
-    private byte[] FillUpTo512(byte[] dataArr)
+    //Дополняет массив байтов до 512 битов, т.е. 64 байтов
+    private byte[] FillUpTo64(byte[] data)
     {
         //в начало добить 0, потом одну 1 и сам dataArr
-        var zeroesAmount = BYTES_LEN_COMMON - dataArr.Length - 1;
+        var zeroesAmount = BYTES_LEN_COMMON - data.Length - 1;
         var res = Enumerable
             .Repeat((byte)0x00, zeroesAmount)
             .Append((byte)0x01).ToList();
-        res.AddRange(dataArr);
+        res.AddRange(data);
         return res.ToArray();
     }
 
-    private byte[] SqueezeTo512(ref byte[] h, byte[] dataArr)
+    /*
+     * Исходные данные делит на блоки по 64 байта, применяет к ним функцию сжатию
+     * и затем две операции суммы по модулю 2^512
+     */
+    private byte[] CutTo64(ref byte[] hash, byte[] data)
     {
-        var bytes512 = BitConverter.GetBytes(512).Reverse().ToArray();
-        var itersAmount = dataArr.Length / BYTES_LEN_COMMON;
-        for (int i = 0; i < itersAmount; ++i)
+        var blocksAmount = data.Length / BYTES_LEN_COMMON;
+        
+        for (int i = 0; i < blocksAmount; ++i)
         {
-            var last512 = dataArr
+            var last512bits = data
                 .SkipLast(i*BYTES_LEN_COMMON)
                 .TakeLast(BYTES_LEN_COMMON)
                 .ToArray();
 
-            h = G(_n, h, last512);
-            _n = SumModulo512(_n, bytes512);
-            _sigma = SumModulo512(_sigma, last512);
+            hash = G(_n, hash, last512bits);
+            _n = SumMod512(_n, Data.Vect512);
+            _sigma = SumMod512(_sigma, last512bits);
         }
+        
+        var leftover = data
+                     .SkipLast(blocksAmount * BYTES_LEN_COMMON)
+                     .ToArray();
 
-        dataArr = dataArr.SkipLast(itersAmount * BYTES_LEN_COMMON).ToArray();
-        return dataArr;
+        return leftover;
     }
 
-    private byte[] Sum512(byte[] a, byte[] b)
+    //XOR двух векторов, в частности операция X
+    private byte[] SumXor512(byte[] a, byte[] b)
     {
         byte[] res = new byte[BYTES_LEN_COMMON];
         for(int i = 0; i < BYTES_LEN_COMMON; ++i)
@@ -100,93 +110,86 @@ public class StribogHash
         }
         return res;
     }
-
-    private byte[] E(byte[] k, byte[] m)
+    
+    //Преобразование E
+    private byte[] E(byte[] key, byte[] m)
     {
-        var res = Sum512(k, m);
+        var res = SumXor512(key, m);
         for (int i = 0; i < 12; ++i)
         {
             res = S(res);
             res = P(res);
             res = L(res);
-            k = KeySchedule(k, i);
-            res = Sum512(res, k);
+            key = GetKeyForRound(key, i);
+            res = SumXor512(res, key);
         }
         return res;
     }
-    
-    private byte[] SumModulo512(byte[] a, byte[] b)
+    //Сложение двух векторов в кольце (просто столбиком складываем два вектора, будто это числа)
+    private byte[] SumMod512(byte[] a, byte[] b)
     {
-        //var modulo = BigInteger.Pow(2, 512);
-        //var aInt = new BigInteger(a);
-        //var bInt = new BigInteger(b);
-        //var sum = (aInt + bInt) % modulo;
+        var aTemp = new byte[BYTES_LEN_COMMON]; Array.Copy(a, 0, aTemp, BYTES_LEN_COMMON - a.Length, a.Length);
+        var bTemp = new byte[BYTES_LEN_COMMON]; Array.Copy(b, 0, bTemp, BYTES_LEN_COMMON - b.Length, b.Length);
 
-        //var res = sum
-        //    .ToByteArray()
-        //    .ToList();
-
-        //res.InsertRange(0, Enumerable.Repeat((byte)0x00, BYTES_LEN_COMMON - res.Count));
-       
-        //return res.ToArray();
-
-        byte[] temp = new byte[64];
-        int i = 0, t = 0;
-        byte[] tempA = new byte[64];
-        byte[] tempB = new byte[64];
-        Array.Copy(a, 0, tempA, 64 - a.Length, a.Length);
-        Array.Copy(b, 0, tempB, 64 - b.Length, b.Length);
-        for (i = 63; i >= 0; i--)
+        var sum = 0;
+        var sumBytes = new byte[BYTES_LEN_COMMON];
+        for(int i = BYTES_LEN_COMMON - 1; i >= 0; --i)
         {
-            t = tempA[i] + tempB[i] + (t >> 8);
-            temp[i] = (byte)(t & 0xFF);
+            sum = aTemp[i] + bTemp[i] + (sum >> 8); //складываем каждый байт и из предыдущего сложения переносим 1
+            sumBytes[i] = (byte)(sum & 0xFF); //операция И с 255, чтобы убрать 1 в 9 разряде, если она есть (число не должно быть больше 255)
         }
-        return temp;
+        return sumBytes;
     }
 
-    private byte[] KeySchedule(byte[] k, int i)
+    //Возращает ключ для раунда
+    private byte[] GetKeyForRound(byte[] key, int round_i)
     {
-        k = Sum512(k, Data.C[i]);
-        k = S(k);
-        k = P(k);
-        k = L(k);
-        return k;
+        key = SumXor512(key, Data.C[round_i]);
+        key = S(key);
+        key = P(key);
+        key = L(key);
+        return key;
     }
 
-    private byte[] G(byte[] n, byte[] h, byte[] m)
+    //Функция сжатия
+    private byte[] G(byte[] n, byte[] hash, byte[] data)
     {
-        var k = Sum512(h, n);
+        var k = SumXor512(hash, n);
         k = S(k);
         k = P(k);
         k = L(k);
        
-        var t = E(k, m);
-        t = Sum512(t, h);
+        var t = E(k, data);
+        t = SumXor512(t, hash);
 
-        var newh = Sum512(t, m);
-        return newh;
+        var newHash = SumXor512(t, data);
+        return newHash;
     }
 
+    
+    //Подставновка s-блоков
     private byte[] S(byte[] data)
     {
         byte[] res = new byte[BYTES_LEN_COMMON];
-        for (int i = 0; i < BYTES_LEN_COMMON; i++)
+        for (int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
             res[i] = Data.Sbox[data[i]];
         } 
         return res;
     }
 
+    //Переставляет байты использую таблицу Tau
     private byte[] P(byte[] data)
     {
         byte[] res = new byte[BYTES_LEN_COMMON];
-        for (int i = 0; i < BYTES_LEN_COMMON; i++)
+        for (int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
             res[i] = data[Data.Tau[i]];
         }
         return res;
     }
-    
+
+    //Линейное преобразование
     private byte[] L(byte[] data)
     {
         const int BYTES_IN_BLOCK = 8;
@@ -200,11 +203,11 @@ public class StribogHash
         {
             var bl = block.Reverse().ToArray();
             var bits = GetBoolArrayFromBytes(bl);
-            var multiplied = 0ul;
+            var multiplied = 0ul; //произведение
 
             for (int i = 0; i < BITS_IN_BLOCK; ++i)
             {
-                if (bits[i])
+                if (bits[i]) //перемножаем константы из массив A только тогда, когда встречаем бит равный 1
                 {
                     multiplied ^= Data.A[i];
                 }
@@ -216,6 +219,7 @@ public class StribogHash
         return res.ToArray();
     }
 
+    //Переводит массив байт в массив бит
     private bool[] GetBoolArrayFromBytes(byte[] data)
     {
         var res = new bool[data.Length * 8];
@@ -224,6 +228,7 @@ public class StribogHash
         return res;
     }
 
+    //Переводит ulong в массив байт
     private byte[] GetBytesArrayFromUlong(ulong num)
     {
         var res = BitConverter.GetBytes(num).Reverse().ToArray();
