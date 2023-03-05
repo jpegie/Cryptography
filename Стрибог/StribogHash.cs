@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 
 namespace Стрибог;
@@ -6,18 +7,23 @@ public class StribogHash
 {
     private const int BYTES_LEN_COMMON = 64;
 
-    private byte[] _n = new byte[BYTES_LEN_COMMON]; //
+    private byte[] _n = new byte[BYTES_LEN_COMMON]; //длина данных
     private byte[] _sigma = new byte[BYTES_LEN_COMMON]; //сумма всех блоков (по 64 байта) данных по по модулю 512
-    private byte[] _initVec = new byte[BYTES_LEN_COMMON];
+    private byte[] _initVec = new byte[BYTES_LEN_COMMON]; //вектор инициализации
     private int _hashLen = 256;
 
     public StribogHash(int hashLen = 256)
     {
+        _hashLen = hashLen;
+        InitInitVec();
+    }
+
+    private void InitInitVec()
+    {
         for (int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
-            _initVec[i] = (byte)(hashLen == 512 ? 0x00 : 0x01);
+            _initVec[i] = (byte)(_hashLen == 512 ? 0x00 : 0x01);
         }
-        _hashLen = hashLen;
     }
 
     public IEnumerable<byte> GetHash(IEnumerable<byte> data)
@@ -28,7 +34,7 @@ public class StribogHash
         var hash = new byte[BYTES_LEN_COMMON];
         _initVec.CopyTo(hash, 0);
 
-        if (dataArr.Length >= BYTES_LEN_COMMON) //если длина данных > 64 байтов, то надо поработать с блоками, получить необохдимые значения для хэш-функции
+        if (dataArr.Length >= BYTES_LEN_COMMON) //если длина данных > 64 байтов, то надо обрезать до <= 64
         {
             dataArr = CutTo64(ref hash, dataArr);
         }
@@ -43,17 +49,17 @@ public class StribogHash
             dataArr = FillUpTo64(dataArr);
         }
 
-        hash = G(_n, hash, dataArr);
-        _n = SumMod512(_n, dataBitsLenInBytes);
-        _sigma = SumMod512(_sigma, dataArr);
-        hash = G(vec0, hash, _n);
-        hash = G(vec0, hash, _sigma);
+        hash = G(_n, hash, dataArr); //применяем функцию сжатия к последнего неполному блоку (уже дополненному)
+        _n = SumMod512(_n, dataBitsLenInBytes); //находим длину данных 
+        _sigma = SumMod512(_sigma, dataArr); //сигма здесь это сумма по блокам (можно поглядеть в CutTo64()), кроме последнего, который был неполны -> прибавим этот неполный блок
+        hash = G(vec0, hash, _n); //сжимаем длину сообщения
+        hash = G(vec0, hash, _sigma); //добавляем в хэш еще и контрольную суммы по блокам
 
         if (_hashLen == 512)
         {
             return hash;
         }
-        else
+        else //если выходной хэш 256, то вернем просто первые 32 байта, т.е. 256 бита
         {
             byte[] h256 = new byte[32];
             Array.Copy(hash, 0, h256, 0, 32);
@@ -94,8 +100,8 @@ public class StribogHash
         }
         
         var leftover = data
-                     .SkipLast(blocksAmount * BYTES_LEN_COMMON)
-                     .ToArray();
+                       .SkipLast(blocksAmount * BYTES_LEN_COMMON)
+                       .ToArray();
 
         return leftover;
     }
