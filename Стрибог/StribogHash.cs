@@ -1,12 +1,10 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
-using System.Security.Cryptography;
 
 namespace Стрибог;
 public class StribogHash
 {
     private const int BYTES_LEN_COMMON = 64;
-
+    private byte[] _hash = new byte[BYTES_LEN_COMMON]; 
     private byte[] _n = new byte[BYTES_LEN_COMMON]; //длина данных
     private byte[] _sigma = new byte[BYTES_LEN_COMMON]; //сумма всех блоков (по 64 байта) данных по по модулю 512
     private byte[] _initVec = new byte[BYTES_LEN_COMMON]; //вектор инициализации
@@ -26,55 +24,47 @@ public class StribogHash
         }
     }
 
-    public IEnumerable<byte> GetHash(IEnumerable<byte> data)
+    public IEnumerable<byte> GetHash(byte[] data)
     {
-        var dataArr = data.ToArray();
-       
         var vec0 = new byte[BYTES_LEN_COMMON];
-        var hash = new byte[BYTES_LEN_COMMON];
-        _initVec.CopyTo(hash, 0);
+        _initVec.CopyTo(_hash, 0);
 
-        if (dataArr.Length >= BYTES_LEN_COMMON) //если длина данных > 64 байтов, то надо обрезать до <= 64
+        data = CutTo64(data); //"обрежем" до <= 64 байт
+
+        var dataLenBits = BitConverter //кол-во бит в данных после сокращения (переведенное в байты)
+                          .GetBytes(data.Length * 8)
+                          .Reverse()
+                          .ToArray();
+
+        data = FillUpTo64(data); //дополним данные до 64 байт
+
+        _hash = G(_n, _hash, data); //применяем функцию сжатия к последнего неполному блоку (уже дополненному)
+        _n = SumMod512(_n, dataLenBits); //находим длину данных 
+        _sigma = SumMod512(_sigma, data); //сигма здесь это сумма по блокам (можно поглядеть в CutTo64()), кроме последнего, который был неполны -> прибавим этот неполный блок
+        _hash = G(vec0, _hash, _n); //сжимаем длину сообщения
+        _hash = G(vec0, _hash, _sigma); //добавляем в хэш еще и контрольную суммы по блокам
+
+        if (_hashLen == 256) //если выходной хэш 256, то вернем просто первые 32 байта, т.е. 256 бита
         {
-            dataArr = CutTo64(ref hash, dataArr);
+            _hash = _hash[..32];
         }
 
-        var dataBitsLenInBytes = BitConverter //кол-во бит в данных после сокращения
-            .GetBytes(dataArr.Length * 8)
-            .Reverse()
-            .ToArray();
-
-        if (dataArr.Length < BYTES_LEN_COMMON) //если после сокращения получилось не 64 байта, то дополним до 64
-        {
-            dataArr = FillUpTo64(dataArr);
-        }
-
-        hash = G(_n, hash, dataArr); //применяем функцию сжатия к последнего неполному блоку (уже дополненному)
-        _n = SumMod512(_n, dataBitsLenInBytes); //находим длину данных 
-        _sigma = SumMod512(_sigma, dataArr); //сигма здесь это сумма по блокам (можно поглядеть в CutTo64()), кроме последнего, который был неполны -> прибавим этот неполный блок
-        hash = G(vec0, hash, _n); //сжимаем длину сообщения
-        hash = G(vec0, hash, _sigma); //добавляем в хэш еще и контрольную суммы по блокам
-
-        if (_hashLen == 512)
-        {
-            return hash;
-        }
-        else //если выходной хэш 256, то вернем просто первые 32 байта, т.е. 256 бита
-        {
-            byte[] h256 = new byte[32];
-            Array.Copy(hash, 0, h256, 0, 32);
-            return h256;
-        }
+        return _hash;
     }
 
     //Дополняет массив байтов до 512 битов, т.е. 64 байтов
     private byte[] FillUpTo64(byte[] data)
     {
+        if (data.Length == BYTES_LEN_COMMON)
+        {
+            return data;
+        }
+
         //в начало добить 0, потом одну 1 и сам dataArr
         var zeroesAmount = BYTES_LEN_COMMON - data.Length - 1;
         var res = Enumerable
-            .Repeat((byte)0x00, zeroesAmount)
-            .Append((byte)0x01).ToList();
+                  .Repeat((byte)0x00, zeroesAmount)
+                  .Append((byte)0x01).ToList();
         res.AddRange(data);
         return res.ToArray();
     }
@@ -83,20 +73,25 @@ public class StribogHash
      * Исходные данные делит на блоки по 64 байта, применяет к ним функцию сжатию
      * и затем две операции суммы по модулю 2^512
      */
-    private byte[] CutTo64(ref byte[] hash, byte[] data)
+    private byte[] CutTo64(byte[] data)
     {
+        if (data.Length < BYTES_LEN_COMMON)
+        {
+            return data;
+        }
+
         var blocksAmount = data.Length / BYTES_LEN_COMMON;
         
         for (int i = 0; i < blocksAmount; ++i)
         {
-            var last512bits = data
-                .SkipLast(i*BYTES_LEN_COMMON)
-                .TakeLast(BYTES_LEN_COMMON)
-                .ToArray();
+            var last64bytes = data
+                              .SkipLast(i*BYTES_LEN_COMMON)
+                              .TakeLast(BYTES_LEN_COMMON)
+                              .ToArray();
 
-            hash = G(_n, hash, last512bits);
+            _hash = G(_n, _hash, last64bytes);
             _n = SumMod512(_n, Data.Vect512);
-            _sigma = SumMod512(_sigma, last512bits);
+            _sigma = SumMod512(_sigma, last64bytes);
         }
         
         var leftover = data
@@ -109,7 +104,7 @@ public class StribogHash
     //XOR двух векторов, в частности операция X
     private byte[] SumXor512(byte[] a, byte[] b)
     {
-        byte[] res = new byte[BYTES_LEN_COMMON];
+        var res = new byte[BYTES_LEN_COMMON];
         for(int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
             res[i] = (byte)(a[i] ^ b[i]);
@@ -131,6 +126,7 @@ public class StribogHash
         }
         return res;
     }
+    
     //Сложение двух векторов в кольце (просто столбиком складываем два вектора, будто это числа)
     private byte[] SumMod512(byte[] a, byte[] b)
     {
@@ -139,11 +135,13 @@ public class StribogHash
 
         var sum = 0;
         var sumBytes = new byte[BYTES_LEN_COMMON];
+
         for(int i = BYTES_LEN_COMMON - 1; i >= 0; --i)
         {
             sum = aTemp[i] + bTemp[i] + (sum >> 8); //складываем каждый байт и из предыдущего сложения переносим 1
             sumBytes[i] = (byte)(sum & 0xFF); //операция И с 255, чтобы убрать 1 в 9 разряде, если она есть (число не должно быть больше 255)
         }
+
         return sumBytes;
     }
 
@@ -172,11 +170,10 @@ public class StribogHash
         return newHash;
     }
 
-    
     //Подставновка s-блоков
     private byte[] S(byte[] data)
     {
-        byte[] res = new byte[BYTES_LEN_COMMON];
+        var res = new byte[BYTES_LEN_COMMON];
         for (int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
             res[i] = Data.Sbox[data[i]];
@@ -187,7 +184,7 @@ public class StribogHash
     //Переставляет байты использую таблицу Tau
     private byte[] P(byte[] data)
     {
-        byte[] res = new byte[BYTES_LEN_COMMON];
+        var res = new byte[BYTES_LEN_COMMON];
         for (int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
             res[i] = data[Data.Tau[i]];
@@ -237,7 +234,9 @@ public class StribogHash
     //Переводит ulong в массив байт
     private byte[] GetBytesArrayFromUlong(ulong num)
     {
-        var res = BitConverter.GetBytes(num).Reverse().ToArray();
-        return res;
+        return BitConverter
+               .GetBytes(num)
+               .Reverse()
+               .ToArray();
     }
 }
