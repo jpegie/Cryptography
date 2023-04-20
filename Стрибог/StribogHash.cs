@@ -8,11 +8,11 @@ public class StribogHash
     private byte[] _n = new byte[BYTES_LEN_COMMON]; //длина данных
     private byte[] _sigma = new byte[BYTES_LEN_COMMON]; //сумма всех блоков (по 64 байта) данных по по модулю 512
     private byte[] _initVec = new byte[BYTES_LEN_COMMON]; //вектор инициализации
-    private int _hashLen = 256;
+    private StribogType _type;
 
-    public StribogHash(int hashLen = 256)
+    public StribogHash(StribogType type)
     {
-        _hashLen = hashLen;
+        _type = type;
         InitInitVec();
     }
 
@@ -20,7 +20,7 @@ public class StribogHash
     {
         for (int i = 0; i < BYTES_LEN_COMMON; ++i)
         {
-            _initVec[i] = (byte)(_hashLen == 512 ? 0x00 : 0x01);
+            _initVec[i] = (byte)(_type == StribogType.Len512 ? 0x00 : 0x01);
         }
     }
 
@@ -44,7 +44,7 @@ public class StribogHash
         _hash = G(vec0, _hash, _n); //сжимаем длину сообщения
         _hash = G(vec0, _hash, _sigma); //добавляем в хэш еще и контрольную суммы по блокам
 
-        if (_hashLen == 256) //если выходной хэш 256, то вернем просто первые 32 байта, т.е. 256 бита
+        if (_type == StribogType.Len256) //если выходной хэш 256, то вернем просто первые 32 байта, т.е. 256 бита
         {
             _hash = _hash[..32];
         }
