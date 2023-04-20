@@ -18,10 +18,10 @@ else
 Console.WriteLine($"HEX: {Convert.ToHexString(dataToHash)}");
 
 Console.Write("Стрибог 256 или 512? ");
-var hashType = int.Parse(Console.ReadLine()!);
-
+var hashTypeInt = int.Parse(Console.ReadLine()!);
+var hashType = hashTypeInt == 256 ? StribogType.Len256 : StribogType.Len512;
 var hash = new StribogHash(hashType).GetHash(dataToHash);
-Console.WriteLine($"Хэш: {Convert.ToHexString(hash.ToArray())}");
+Console.WriteLine($"HASH: {Convert.ToHexString(hash.ToArray())}");
 
 //Хэш-кодом сообщения M_1, является значение:
 //H(M_1) = 00557be5e5841d52a449M6b0251d05d27f94ab76cbaa6da890b59d8e11e159d.
