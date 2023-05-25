@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Net.Security;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -64,7 +59,8 @@ namespace kuznechik
 							normal_kuz.LSX(ref inputDataCopy, key0);
 							key1[injectingByteIndex] = (byte)(inputDataCopy[injectingByteIndex] ^ TransformationTables.ReversedPi[0]);
 						}
-						foundKeyByte = true;
+						foundKeyByte =
+							true;
 						injectingByteIndex++;
 
                     }
