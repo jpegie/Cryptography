@@ -10,7 +10,6 @@ public class TrustCenter
     const int MAX_PARAM_VAL = int.MaxValue;
     BigInteger _modulo;
     long _p, _q;
-
     public TrustCenter()
     {
         GenerateParams();
