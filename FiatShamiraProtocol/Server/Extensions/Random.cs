@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Numerics;
+namespace Server.Extensions;
 
-namespace FiatShamiraProtocol.Модель.Дополнения;
 public static class RandomExtensions
 {
     [ThreadStatic] private static Random Local;
@@ -15,8 +9,6 @@ public static class RandomExtensions
     {
         get { return Local ?? (Local = new Random(unchecked(Environment.TickCount * 31 + Thread.CurrentThread.ManagedThreadId))); }
     }
-
-
     /// <summary>
     /// Returns a random BigInteger that is within a specified range.
     /// The lower bound is inclusive, and the upper bound is exclusive.
@@ -27,10 +19,7 @@ public static class RandomExtensions
         if (minValue > maxValue) throw new ArgumentException();
         if (minValue == maxValue) return minValue;
         BigInteger zeroBasedUpperBound = maxValue - 1 - minValue; // Inclusive
-        Debug.Assert(zeroBasedUpperBound.Sign >= 0);
         byte[] bytes = zeroBasedUpperBound.ToByteArray();
-        Debug.Assert(bytes.Length > 0);
-        Debug.Assert((bytes[bytes.Length - 1] & 0b10000000) == 0);
 
         // Search for the most significant non-zero bit
         byte lastByteMask = 0b11111111;
@@ -44,9 +33,9 @@ public static class RandomExtensions
             random.NextBytes(bytes);
             bytes[bytes.Length - 1] &= lastByteMask;
             var result = new BigInteger(bytes);
-            Debug.Assert(result.Sign >= 0);
             if (result <= zeroBasedUpperBound) return result + minValue;
         }
     }
 }
+
 

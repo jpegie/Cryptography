@@ -1,47 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using Server.Extensions;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace FiatShamiraProtocol.Модель;
-
-public class User
+namespace Client;
+public class ClientProtocolData
 {
     BigInteger _privateKey;
     BigInteger _publicKey;
     BigInteger _modulo;
-    VerificationCenter _verificationCenter;
     string _name;
-   
-    public User(BigInteger modulo, string name)
+
+    public ClientProtocolData(string name)
     {
-        _verificationCenter = new VerificationCenter(modulo); 
         _name = name;
+    }
+    public string Name => _name;
+    public BigInteger Modulo => _modulo;    
+    public BigInteger PublicKey => _publicKey;
+    public BigInteger PrivateKey => _privateKey;    
+
+    public void GenerateKeys(BigInteger modulo)
+    {
         _modulo = modulo;
         GeneratePrivateKey();
         GeneratePublicKey();
     }
-    public string Name => _name;
-    public BigInteger PublicKey => _publicKey;
-    public void ReceiveMessage()
-    {
-        throw new NotImplementedException();
-    }
-    public void SendMessage() 
-    {
-        throw new NotImplementedException();
-    }
     private void GeneratePrivateKey()
     {
         var isPrivateKeyFound = false;
-        var buffPrivateKey = 1;
+        var buffPrivateKey = new Random().NextBigInteger(1, 100); //генерация начальной точки
 
-        while(!isPrivateKeyFound && buffPrivateKey < _modulo)
+        while (!isPrivateKeyFound && buffPrivateKey < _modulo)
         {
-            //тут всегда сразу выходить будем, потому что с 1 всегда НОД = 1
-            //TODO: мб сделать какой-то старт поинт, т.е. число, с которого начинается генерация вместо 1
             if (BigInteger.GreatestCommonDivisor(_modulo, buffPrivateKey) == 1)
             {
                 isPrivateKeyFound = true;
