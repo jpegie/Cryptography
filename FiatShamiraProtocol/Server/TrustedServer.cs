@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json;
+using Server.Helpers;
 
 namespace Server;
 internal class TrustedServer
@@ -70,7 +71,7 @@ internal class TrustedServer
             message.Receiver, 
             MessageType.Default);
         verificationMessage.UpdateMessageFrame("Verification started...");
-        MessagingHelper.Response(_socket, message);
+        MessagingHelper.Response(_socket, verificationMessage);
         verificationMessage.Type = MessageType.Verification;
         for (int round_i = 0; round_i < 40; ++round_i)
         {

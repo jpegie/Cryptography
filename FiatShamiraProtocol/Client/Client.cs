@@ -5,6 +5,7 @@ using Server;
 using System.Numerics;
 using System.Text;
 using Newtonsoft.Json;
+using Server.Helpers;
 
 namespace Client;
 internal class Client
@@ -78,18 +79,18 @@ internal class Client
                 {
                     _isRegistered = true;
                 }
-                PrintMessage(message);
+                PrintHelper.PrintMessage(message);
                 break;
             case MessageType.Default:
-                PrintMessage(message);
+                PrintHelper.PrintMessage(message);
                 break;
         }
     }
     private ValuedMessage ParseNewMessageFromConsole()
     {
-        Print("Message: ", false);
+        PrintHelper.Print("Message: ", false);
         var text = Console.ReadLine()!;
-        Print("To: ", false);
+        PrintHelper.Print("To: ", false);
         var receiver = Console.ReadLine()!;
         var message = new ValuedMessage (_protocolData.Name, receiver, MessageType.Default);
         message.UpdateMessageFrame(text);
@@ -122,32 +123,5 @@ internal class Client
         }
         var responseMessageSerialized = JsonConvert.SerializeObject(reponseMessage);
         return MessagingHelper.ComposeMessageToServer(responseMessageSerialized);
-    }
-    object printLock = new object();
-    void PrintMessage(ValuedMessage message)
-    {
-        foreach(var frame in message.Frames)
-        {
-            Print($"{message.Sender}: {frame.Key} = {frame.Value}", true);
-        }
-        
-    }
-    void Print(string message, bool addNewLine)
-    {
-        lock (printLock)
-        {
-            //"очистка" текущей строки
-            Console.SetCursorPosition(0, Console.CursorTop);
-            Console.Write(new string(' ', Console.WindowWidth));
-            Console.SetCursorPosition(0, Console.CursorTop);
-            if (addNewLine)
-            {
-                Console.WriteLine(message);
-            }
-            else
-            {
-                Console.Write(message);
-            }
-        }
     }
 }

@@ -4,7 +4,7 @@ using System.ServiceModel.Channels;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Server;
+namespace Server.Helpers;
 public static class MessagingHelper
 {
     public static void Response(NetMQSocket socket, ValuedMessage messageToResponseTo)
