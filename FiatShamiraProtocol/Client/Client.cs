@@ -4,6 +4,9 @@ using Server.Extensions;
 using Server;
 using System.Numerics;
 using System.Text;
+using System.Text.Json.Serialization;
+using System.Text.Json;
+using System.Security.Cryptography.Xml;
 
 namespace Client;
 internal class Client
@@ -12,6 +15,7 @@ internal class Client
     NetMQPoller _poller;
     ClientProtocolData _protocolData;
     VerificationParams _curVerifParams;
+    Task _requestingMessageTask;
     bool _isRegistered = false;
 
     public Client(string name, int port = 12346)
@@ -31,29 +35,29 @@ internal class Client
     private void Register()
     {
         var registerMessage = MessagingHelper.ComposeMessage(
-            ReceivedMessage.SERVER_NAME,        //получатель
-            ReceivedMessage.REGISTRATION,  //сообщение
-            _protocolData.PublicKey.ToString());
+           ReceivedMessage.SERVER_NAME,   //получатель
+           ReceivedMessage.REGISTRATION,  //сообщение
+           _protocolData.PublicKey.ToString());
         MessagingHelper.TrySendMessage(_socket, registerMessage);
     }
 
     public void Start()
     {
-        Task.Factory.StartNew(state =>
+        _requestingMessageTask = new Task(() =>
         {
             Register();
             while (true)
             {
                 if (_isRegistered)
                 {
-                    Print("Message: ", false);
-                    var msgStr = Console.ReadLine()!;
-                    var message = MessagingHelper.ComposeMessage(ReceivedMessage.SERVER_NAME, msgStr);
+                    var newMessage = ParseNewMessageFromConsole();
+                    var message = MessagingHelper.ComposeMessageToServer(newMessage);
                     MessagingHelper.TrySendMessage(_socket, message);
                     Thread.Sleep(2000);
                 }
             }
-        }, Name, TaskCreationOptions.LongRunning);
+        }, TaskCreationOptions.LongRunning);
+        _requestingMessageTask.Start();
         _poller.RunAsync();
     }
 
@@ -71,13 +75,21 @@ internal class Client
         {
             var receivedMsg = new ReceivedMessage(msg);
             PrintMessage(receivedMsg);
-            if (receivedMsg.MessageString == "Registration completed!")
+            if (receivedMsg.Message == "Registration completed!")
             {
                 _isRegistered = true;
             }
         }
     }
-
+    private string ParseNewMessageFromConsole()
+    {
+        var msg = "";
+        Print("Message: ", false);
+        msg = Console.ReadLine()!;
+        Print("To: ", false);
+        msg += ";" + Console.ReadLine()!;
+        return msg;
+    }
     private NetMQMessage ComposeResponseValuedMessage(VerificationMessage receivedMsg)
     {
         var requestedValue = receivedMsg.RequestedValue.Split(";");
@@ -99,8 +111,7 @@ internal class Client
             default:
                 break;
         }
-        return MessagingHelper.ComposeMessage(
-            ReceivedMessage.SERVER_NAME,   //получатель
+        return MessagingHelper.ComposeMessageToServer(
             "Value",
             requestedValueName,
             responseValue.ToString()); //сообщение)
@@ -108,7 +119,7 @@ internal class Client
     object printLock = new object();
     void PrintMessage(ReceivedMessage message)
     {
-        Print($"{message.SenderString}: {message.MessageString}", true);
+        Print($"{message.Sender}: {message.Message}", true);
     }
     void Print(string message, bool addNewLine)
     {

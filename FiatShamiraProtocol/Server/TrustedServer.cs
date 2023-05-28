@@ -3,6 +3,7 @@ using NetMQ;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Server;
 internal class TrustedServer
@@ -41,13 +42,26 @@ internal class TrustedServer
             var isUserVerified = VerifySenderGenuine(clientMessage);
             if (isUserVerified)
             {
-                MessagingHelper.Response(_socket, clientMessage, $"You are actual '{clientMessage.SenderString}'");
-                //var msg = MessagingHelper.ComposeMessage(clientMessage.ReceiverString, clientMessage.SenderString, clientMessage.ReceiverString, clientMessage.MessageString);
-                //MessagingHelper.TrySendMessage(_socket, msg);
+                MessagingHelper.Response(_socket, clientMessage, $"You are actual '{clientMessage.Sender}'");
+                
+                var messageArr = clientMessage.Message.Split(";");
+                var realReceiver = messageArr[1];
+                var onlyMessageText = messageArr[0];
+                var msg = MessagingHelper.ComposeMessage(realReceiver, clientMessage.Sender, clientMessage.Receiver, onlyMessageText);
+                var isMessageSent = MessagingHelper.TrySendMessage(_socket, msg);
+                if (isMessageSent)
+                {
+                    MessagingHelper.Response(_socket, clientMessage, $"Message sent to '{realReceiver}'");
+                }
+                else
+                {
+                    MessagingHelper.Response(_socket, clientMessage, $"Error occured while sending message to '{realReceiver}'");
+                }
+                
             }
             else
             {
-                MessagingHelper.Response(_socket, clientMessage, $"You are dickhead, but not '{clientMessage.SenderString}'");
+                MessagingHelper.Response(_socket, clientMessage, $"You are dickhead, but not '{clientMessage.Sender}'");
             }
         }
     }
@@ -68,7 +82,7 @@ internal class TrustedServer
                 isVerified = false;
                 break;
             }
-            else if (BigInteger.ModPow(y.ValueBigInteger, 2, _modulo) != (x.ValueBigInteger * BigInteger.ModPow(_registratedUsers[message.SenderString], e, _modulo)) % _modulo)
+            else if (BigInteger.ModPow(y.ValueBigInteger, 2, _modulo) != (x.ValueBigInteger * BigInteger.ModPow(_registratedUsers[message.Sender], e, _modulo)) % _modulo)
             {
                 isVerified = false;
                 break;
@@ -80,8 +94,8 @@ internal class TrustedServer
 
     public void RegisterClient(ReceivedMessage message)
     {
-        if (!_registratedUsers.ContainsKey(message.SenderString))
-            _registratedUsers.Add(message.SenderString, message.PublicKeyBigInteger);
+        if (!_registratedUsers.ContainsKey(message.Sender))
+            _registratedUsers.Add(message.Sender, message.PublicKeyBigInteger);
         MessagingHelper.Response(_socket, message, "Registration completed!");
     }
 }

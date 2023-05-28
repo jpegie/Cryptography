@@ -5,12 +5,10 @@ public static class MessagingHelper
 {
     public static void Response(NetMQSocket socket, ReceivedMessage messageToResponseTo, string message, params string[] list)
     {
-        //var sender = responseBy == "" ? "Server" : messageToResponseTo.ReceiverString;
-        var sender = "Server";
         var responseMessage = ComposeMessage(
-            messageToResponseTo.SenderString,   //кому отправить
-            sender,                             //от кого отправление
-            messageToResponseTo.SenderString,   //первая строка получателю не придет, но хочу сохранить в мете 
+            messageToResponseTo.Sender,   //кому отправить
+            messageToResponseTo.Receiver,                             //от кого отправление
+            messageToResponseTo.Sender,   //первая строка получателю не придет, но хочу сохранить в мете 
             message);                           //само сообщение
         foreach(var param in list)
         {
@@ -26,9 +24,13 @@ public static class MessagingHelper
         {
             message.Append(param);
         }
-        
-
         return message;
+    }
+    public static NetMQMessage ComposeMessageToServer(params string[] list)
+    {
+        var serverParam = new string[] { ReceivedMessage.SERVER_NAME };
+        list = serverParam.Concat(list).ToArray();
+        return ComposeMessage(list);
     }
     public static bool TrySendMessage(NetMQSocket socket, NetMQMessage message)
     {

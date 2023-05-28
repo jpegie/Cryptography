@@ -21,17 +21,17 @@ public class ReceivedMessage
         PublicKeyFrame = message.FrameCount >= 4
             ? message[PUBLICKEY_INDEX]
             : new NetMQFrame(SERVER_PUBLICKEY.ToString()); //у сервера нет публичного ключа, он его не отправляет, поэтому пусть будет -1
-        SenderString = SenderFrame.ConvertToString();
-        ReceiverString = ReceiverFrame.ConvertToString();
-        MessageString = MessageFrame.ConvertToString();
+        Sender = SenderFrame.ConvertToString();
+        Receiver = ReceiverFrame.ConvertToString();
+        Message = MessageFrame.ConvertToString();
         PublicKeyString = PublicKeyFrame.ConvertToString();
     }
     public bool IsRegistrationMessage
     {
         get
         {
-            return ReceiverString == SERVER_NAME
-                && MessageString == REGISTRATION
+            return Receiver == SERVER_NAME
+                && Message == REGISTRATION
                 ? true
                 : false;
         }
@@ -40,9 +40,9 @@ public class ReceivedMessage
     public NetMQFrame ReceiverFrame { get; private set; }
     public NetMQFrame MessageFrame { get; private set; }
     public NetMQFrame PublicKeyFrame { get; private set; }
-    public string SenderString { get; private set; }
-    public string ReceiverString { get; private set; }
-    public string MessageString { get; private set; }
+    public string Sender { get; private set; }
+    public string Receiver { get; private set; }
+    public string Message { get; private set; }
     public string PublicKeyString { get; private set; }
     public BigInteger PublicKeyBigInteger
     {
