@@ -6,6 +6,5 @@ class ClientEntryPoint
         Console.Write("Username: ");
         var user = new Client(Console.ReadLine()!);
         user.Start();
-        Console.Read();
     }
 }

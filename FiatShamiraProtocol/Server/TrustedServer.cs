@@ -41,20 +41,23 @@ internal class TrustedServer
         {
             //на время верификации обработка сообщений отдается полностью методу VerifySenderGenuine
             var isUserVerified = VerifySenderGenuine(clientMessage);
+            var reponseMessageToSender = clientMessage.Clone();
+
             if (isUserVerified)
             {
-                clientMessage.AddMessageFrame($"You are actual '{clientMessage.Sender}'");
-                MessagingHelper.Response(_socket, clientMessage);
-
-                var responseToClientMessage = new ValuedMessage(clientMessage.Sender, clientMessage.Receiver, MessageType.Default);
-                var messageToClient = MessagingHelper.ComposeMessage(JsonConvert.SerializeObject(responseToClientMessage));
+                reponseMessageToSender.UpdateMessageFrame($"You are actual '{clientMessage.Sender}'");
+                MessagingHelper.Response(_socket, reponseMessageToSender);
+                //отправка сообщения получателю
+                var messageToClient = MessagingHelper.ComposeMessage(
+                    clientMessage.Receiver, 
+                    JsonConvert.SerializeObject(clientMessage));
                 MessagingHelper.TrySendMessage(_socket, messageToClient);
             }
             else
             {
 
-                clientMessage.AddMessageFrame($"You are dickhead, but not '{clientMessage.Sender}'");
-                MessagingHelper.Response(_socket, clientMessage);
+                reponseMessageToSender.UpdateMessageFrame($"You are dickhead, but not '{reponseMessageToSender.Sender}'");
+                MessagingHelper.Response(_socket, reponseMessageToSender);
             }
         }
     }
@@ -62,27 +65,30 @@ internal class TrustedServer
     private bool VerifySenderGenuine(ValuedMessage message)
     {
         var isVerified = true;
-        message.Frames.Clear();
-        message.AddMessageFrame("Verification started...");
+        var verificationMessage = new ValuedMessage(
+            message.Sender, 
+            message.Receiver, 
+            MessageType.Default);
+        verificationMessage.UpdateMessageFrame("Verification started...");
         MessagingHelper.Response(_socket, message);
-        message.Type = MessageType.Verification;
+        verificationMessage.Type = MessageType.Verification;
         for (int round_i = 0; round_i < 40; ++round_i)
         {
-            message.Frames.Clear();
-            message.AddFrameAsRequestingValue("x"); //добавляю X как запрос
-            MessagingHelper.Response(_socket, message); //отправка запроса на получение значения <x>
+            verificationMessage.Frames.Clear();
+            verificationMessage.AddFrameAsRequestingValue("x"); //добавляю X как запрос
+            MessagingHelper.Response(_socket, verificationMessage); //отправка запроса на получение значения <x>
             var x = MessagingHelper.ParseValuedMessage(_socket.ReceiveMultipartMessage()); //получение <x> ответвым сообщением
-            
-            message.Frames.Clear();
+
+            verificationMessage.Frames.Clear();
             var e = RandomNumberGenerator.GetInt32(0, 2); //генерация <e>
-            message.AddFrameAsRequestingValue("y"); //y как запрос
-            message.AddFrame("e", e); //добавляю e как параметр
-            MessagingHelper.Response(_socket, message); //отправка запроса на получение значения <x>
+            verificationMessage.AddFrameAsRequestingValue("y"); //y как запрос
+            verificationMessage.AddFrame("e", e); //добавляю e как параметр
+            MessagingHelper.Response(_socket, verificationMessage); //отправка запроса на получение значения <x>
             
             var y = MessagingHelper.ParseValuedMessage(_socket.ReceiveMultipartMessage()); //получение <y> ответвым сообщением
             
-            var yValue = (BigInteger)y!.Frames["y"];
-            var xValue = (BigInteger)x!.Frames["x"];
+            var yValue = BigInteger.Parse(y!.Frames["y"].ToString()!);
+            var xValue = BigInteger.Parse(x!.Frames["x"].ToString()!);
 
             if (yValue == 0)
             {
@@ -92,7 +98,7 @@ internal class TrustedServer
             else 
             {
                 var leftSide = BigInteger.ModPow(yValue, 2, _modulo);
-                var rightSide = xValue * BigInteger.ModPow(_registratedUsers[message.Sender], e, _modulo) % _modulo;
+                var rightSide = xValue * BigInteger.ModPow(_registratedUsers[verificationMessage.Sender], e, _modulo) % _modulo;
                 if (leftSide != rightSide)
                 {
                     isVerified = false;
@@ -100,8 +106,9 @@ internal class TrustedServer
                 }
             }
         }
-        message.AddMessageFrame("Verification finished...");
-        MessagingHelper.Response(_socket, message);
+        verificationMessage.Type = MessageType.Default;
+        verificationMessage.UpdateMessageFrame("Verification finished...");
+        MessagingHelper.Response(_socket, verificationMessage);
         return isVerified;
     }
 
@@ -109,7 +116,6 @@ internal class TrustedServer
     {
         if (!_registratedUsers.ContainsKey(message.Sender))
             _registratedUsers.Add(message.Sender, BigInteger.Parse(message.Frames["PublicKey"].ToString()!));
-        //message.SwapSenderWithReceiver();
         message.AddFrame("Status", "Registration completed");
         MessagingHelper.Response(_socket, message);
     }

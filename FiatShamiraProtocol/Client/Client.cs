@@ -49,11 +49,12 @@ internal class Client
             {
                 if (_isRegistered)
                 {
+                    Thread.Sleep(1000);
                     var newMessage = ParseNewMessageFromConsole();
                     var newMessageSerialized = JsonConvert.SerializeObject(newMessage);
                     var message = MessagingHelper.ComposeMessageToServer(newMessageSerialized);
                     MessagingHelper.TrySendMessage(_socket, message);
-                    Thread.Sleep(2000);
+                    Thread.Sleep(1000);
                 }
             }
         }, TaskCreationOptions.LongRunning);
@@ -68,7 +69,7 @@ internal class Client
         switch (message!.Type)
         {
             case MessageType.Verification:
-                Print($"[VRound #{-1}] Request for <{-1}>...", true);
+                //Print($"[VRound #{-1}] Request for <{-1}>...", true);
                 NetMQMessage responseMessage = ComposeResponseValuedMessage(message);
                 MessagingHelper.TrySendMessage(e.Socket, responseMessage);
                 break;
@@ -86,36 +87,39 @@ internal class Client
     }
     private ValuedMessage ParseNewMessageFromConsole()
     {
-        var msg = "";
         Print("Message: ", false);
         var text = Console.ReadLine()!;
         Print("To: ", false);
         var receiver = Console.ReadLine()!;
         var message = new ValuedMessage (_protocolData.Name, receiver, MessageType.Default);
+        message.UpdateMessageFrame(text);
         return message;
     }
     private NetMQMessage ComposeResponseValuedMessage(ValuedMessage message)
     {
         var responseValue = new BigInteger(0);
-        var frameName = message.Frames.First().Key;
-        switch (frameName)
-        {
-            case "x":
-                _curVerifParams.R = new Random().NextBigInteger(1, _protocolData.Modulo);
-                _curVerifParams.X = BigInteger.ModPow(_curVerifParams.R, 2, _protocolData.Modulo);
-                responseValue = _curVerifParams.X;
-                break;
-            case "y":
-                _curVerifParams.E = (BigInteger)message.Frames["e"];
-                _curVerifParams.Y = _curVerifParams.R * BigInteger.ModPow(_protocolData.PrivateKey, _curVerifParams.E, _protocolData.Modulo);
-                responseValue = _curVerifParams.Y;
-                break;
-            default:
-                break;
-        }
         var reponseMessage = new ValuedMessage(_protocolData.Name, "Server", MessageType.Default);
-        reponseMessage.Frames.Add(frameName, responseValue);
+        foreach (var frame in message.Frames)
+        {
+            var frameName = frame.Key;
 
+            switch (frameName)
+            {
+                case "x":
+                    _curVerifParams.R = new Random().NextBigInteger(1, _protocolData.Modulo);
+                    _curVerifParams.X = BigInteger.ModPow(_curVerifParams.R, 2, _protocolData.Modulo);
+                    responseValue = _curVerifParams.X;
+                    break;
+                case "y":
+                    _curVerifParams.E = BigInteger.Parse(message.Frames["e"].ToString()!);
+                    _curVerifParams.Y = _curVerifParams.R * BigInteger.ModPow(_protocolData.PrivateKey, _curVerifParams.E, _protocolData.Modulo);
+                    responseValue = _curVerifParams.Y;
+                    break;
+                default:
+                    break;
+            }
+            reponseMessage.Frames[frameName] = responseValue;
+        }
         var responseMessageSerialized = JsonConvert.SerializeObject(reponseMessage);
         return MessagingHelper.ComposeMessageToServer(responseMessageSerialized);
     }

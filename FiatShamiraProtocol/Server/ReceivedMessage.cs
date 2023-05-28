@@ -228,7 +228,7 @@ public class ValuedMessage : IMessage
     {
         AddFrame(name, -1);
     }
-    public void AddMessageFrame(string message) 
+    public void UpdateMessageFrame(string message) 
     {
         if (_frames.ContainsKey("Message"))
         {
@@ -244,6 +244,15 @@ public class ValuedMessage : IMessage
         var buff = _sender;
         _sender = _receiver;
         _receiver = _sender;
+    }
+    public ValuedMessage Clone()
+    {
+        var clone = new ValuedMessage(_sender, _receiver, _messageType);
+        foreach(var frame in _frames)
+        {
+            clone.AddFrame(frame.Key, frame.Value);
+        }
+        return clone;
     }
 }
 
