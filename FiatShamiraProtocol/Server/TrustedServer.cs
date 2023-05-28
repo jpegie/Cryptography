@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace Server;
 internal class TrustedServer
@@ -31,8 +32,8 @@ internal class TrustedServer
 
     private void HandleReceivingMessage(NetMQMessage message)
     {
-        var clientMessage = new ReceivedMessage(message);
-        if (clientMessage.IsRegistrationMessage)
+        var clientMessage = MessagingHelper.ParseValuedMessage(message);
+        if (clientMessage!.Type == MessageType.Registration)
         {
             RegisterClient(clientMessage);
         }
@@ -42,60 +43,74 @@ internal class TrustedServer
             var isUserVerified = VerifySenderGenuine(clientMessage);
             if (isUserVerified)
             {
-                MessagingHelper.Response(_socket, clientMessage, $"You are actual '{clientMessage.Sender}'");
-                
-                var messageArr = clientMessage.Message.Split(";");
-                var realReceiver = messageArr[1];
-                var onlyMessageText = messageArr[0];
-                var msg = MessagingHelper.ComposeMessage(realReceiver, clientMessage.Sender, clientMessage.Receiver, onlyMessageText);
-                var isMessageSent = MessagingHelper.TrySendMessage(_socket, msg);
-                if (isMessageSent)
-                {
-                    MessagingHelper.Response(_socket, clientMessage, $"Message sent to '{realReceiver}'");
-                }
-                else
-                {
-                    MessagingHelper.Response(_socket, clientMessage, $"Error occured while sending message to '{realReceiver}'");
-                }
-                
+                clientMessage.AddMessageFrame($"You are actual '{clientMessage.Sender}'");
+                MessagingHelper.Response(_socket, clientMessage);
+
+                var responseToClientMessage = new ValuedMessage(clientMessage.Sender, clientMessage.Receiver, MessageType.Default);
+                var messageToClient = MessagingHelper.ComposeMessage(JsonConvert.SerializeObject(responseToClientMessage));
+                MessagingHelper.TrySendMessage(_socket, messageToClient);
             }
             else
             {
-                MessagingHelper.Response(_socket, clientMessage, $"You are dickhead, but not '{clientMessage.Sender}'");
+
+                clientMessage.AddMessageFrame($"You are dickhead, but not '{clientMessage.Sender}'");
+                MessagingHelper.Response(_socket, clientMessage);
             }
         }
     }
 
-    private bool VerifySenderGenuine(ReceivedMessage message)
+    private bool VerifySenderGenuine(ValuedMessage message)
     {
         var isVerified = true;
-        MessagingHelper.Response(_socket, message, "Verification started...");
+        message.Frames.Clear();
+        message.AddMessageFrame("Verification started...");
+        MessagingHelper.Response(_socket, message);
+        message.Type = MessageType.Verification;
         for (int round_i = 0; round_i < 40; ++round_i)
         {
-            MessagingHelper.Response(_socket, message, "Verification", "x", round_i.ToString()); //отправка запроса на получение значения <x>
-            var x = new ValuedMessage(_socket.ReceiveMultipartMessage()); //получение <x> ответвым сообщением
+            message.Frames.Clear();
+            message.AddFrameAsRequestingValue("x"); //добавляю X как запрос
+            MessagingHelper.Response(_socket, message); //отправка запроса на получение значения <x>
+            var x = MessagingHelper.ParseValuedMessage(_socket.ReceiveMultipartMessage()); //получение <x> ответвым сообщением
+            
+            message.Frames.Clear();
             var e = RandomNumberGenerator.GetInt32(0, 2); //генерация <e>
-            MessagingHelper.Response(_socket, message, "Verification", $"y;{e}", round_i.ToString()); //отправка запроса на получение значения <x>
-            var y = new ValuedMessage(_socket.ReceiveMultipartMessage()); //получение <y> ответвым сообщением
-            if (y.ValueBigInteger == 0)
+            message.AddFrameAsRequestingValue("y"); //y как запрос
+            message.AddFrame("e", e); //добавляю e как параметр
+            MessagingHelper.Response(_socket, message); //отправка запроса на получение значения <x>
+            
+            var y = MessagingHelper.ParseValuedMessage(_socket.ReceiveMultipartMessage()); //получение <y> ответвым сообщением
+            
+            var yValue = (BigInteger)y!.Frames["y"];
+            var xValue = (BigInteger)x!.Frames["x"];
+
+            if (yValue == 0)
             {
                 isVerified = false;
                 break;
             }
-            else if (BigInteger.ModPow(y.ValueBigInteger, 2, _modulo) != (x.ValueBigInteger * BigInteger.ModPow(_registratedUsers[message.Sender], e, _modulo)) % _modulo)
+            else 
             {
-                isVerified = false;
-                break;
+                var leftSide = BigInteger.ModPow(yValue, 2, _modulo);
+                var rightSide = xValue * BigInteger.ModPow(_registratedUsers[message.Sender], e, _modulo) % _modulo;
+                if (leftSide != rightSide)
+                {
+                    isVerified = false;
+                    break;
+                }
             }
         }
-        MessagingHelper.Response(_socket, message, "Verification finished...");
+        message.AddMessageFrame("Verification finished...");
+        MessagingHelper.Response(_socket, message);
         return isVerified;
     }
 
-    public void RegisterClient(ReceivedMessage message)
+    public void RegisterClient(ValuedMessage message)
     {
         if (!_registratedUsers.ContainsKey(message.Sender))
-            _registratedUsers.Add(message.Sender, message.PublicKeyBigInteger);
-        MessagingHelper.Response(_socket, message, "Registration completed!");
+            _registratedUsers.Add(message.Sender, BigInteger.Parse(message.Frames["PublicKey"].ToString()!));
+        //message.SwapSenderWithReceiver();
+        message.AddFrame("Status", "Registration completed");
+        MessagingHelper.Response(_socket, message);
     }
 }

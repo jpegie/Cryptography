@@ -4,9 +4,7 @@ using Server.Extensions;
 using Server;
 using System.Numerics;
 using System.Text;
-using System.Text.Json.Serialization;
-using System.Text.Json;
-using System.Security.Cryptography.Xml;
+using Newtonsoft.Json;
 
 namespace Client;
 internal class Client
@@ -34,11 +32,12 @@ internal class Client
     public string Name => _protocolData.Name;
     private void Register()
     {
-        var registerMessage = MessagingHelper.ComposeMessage(
-           ReceivedMessage.SERVER_NAME,   //получатель
-           ReceivedMessage.REGISTRATION,  //сообщение
-           _protocolData.PublicKey.ToString());
-        MessagingHelper.TrySendMessage(_socket, registerMessage);
+        var registerMessage = new ValuedMessage(_protocolData.Name, "Server", MessageType.Registration);
+        registerMessage.AddFrame("PublicKey", _protocolData.PublicKey);
+
+        var registerMessageSerialized = JsonConvert.SerializeObject(registerMessage);
+        var messageForServer = MessagingHelper.ComposeMessageToServer(registerMessageSerialized);
+        MessagingHelper.TrySendMessage(_socket, messageForServer);
     }
 
     public void Start()
@@ -51,7 +50,8 @@ internal class Client
                 if (_isRegistered)
                 {
                     var newMessage = ParseNewMessageFromConsole();
-                    var message = MessagingHelper.ComposeMessageToServer(newMessage);
+                    var newMessageSerialized = JsonConvert.SerializeObject(newMessage);
+                    var message = MessagingHelper.ComposeMessageToServer(newMessageSerialized);
                     MessagingHelper.TrySendMessage(_socket, message);
                     Thread.Sleep(2000);
                 }
@@ -63,40 +63,42 @@ internal class Client
 
     void HandleReceivingMessage(object sender, NetMQSocketEventArgs e)
     {
-        var msg = e.Socket.ReceiveMultipartMessage();
-        if (VerificationMessage.IsVerificationMessage(msg))
+        var receivedMessage = e.Socket.ReceiveMultipartMessage();
+        var message = MessagingHelper.ParseValuedMessage(receivedMessage);
+        switch (message!.Type)
         {
-            var receivedMsg = new VerificationMessage(msg);
-            Print($"[VRound #{receivedMsg.VerificationRoundInt}] Request for <{receivedMsg.RequestedValue}>...", true);
-            NetMQMessage responseMessage = ComposeResponseValuedMessage(receivedMsg);
-            MessagingHelper.TrySendMessage(e.Socket, responseMessage);
-        }
-        else
-        {
-            var receivedMsg = new ReceivedMessage(msg);
-            PrintMessage(receivedMsg);
-            if (receivedMsg.Message == "Registration completed!")
-            {
-                _isRegistered = true;
-            }
+            case MessageType.Verification:
+                Print($"[VRound #{-1}] Request for <{-1}>...", true);
+                NetMQMessage responseMessage = ComposeResponseValuedMessage(message);
+                MessagingHelper.TrySendMessage(e.Socket, responseMessage);
+                break;
+            case MessageType.Registration:
+                if (message.Frames["Status"].ToString() == "Registration completed")
+                {
+                    _isRegistered = true;
+                }
+                PrintMessage(message);
+                break;
+            case MessageType.Default:
+                PrintMessage(message);
+                break;
         }
     }
-    private string ParseNewMessageFromConsole()
+    private ValuedMessage ParseNewMessageFromConsole()
     {
         var msg = "";
         Print("Message: ", false);
-        msg = Console.ReadLine()!;
+        var text = Console.ReadLine()!;
         Print("To: ", false);
-        msg += ";" + Console.ReadLine()!;
-        return msg;
+        var receiver = Console.ReadLine()!;
+        var message = new ValuedMessage (_protocolData.Name, receiver, MessageType.Default);
+        return message;
     }
-    private NetMQMessage ComposeResponseValuedMessage(VerificationMessage receivedMsg)
+    private NetMQMessage ComposeResponseValuedMessage(ValuedMessage message)
     {
-        var requestedValue = receivedMsg.RequestedValue.Split(";");
-        var requestedValueName = requestedValue[0];
-        var requestedValueParam = requestedValue.Length == 2 ? requestedValue[1] : null;
         var responseValue = new BigInteger(0);
-        switch (requestedValueName)
+        var frameName = message.Frames.First().Key;
+        switch (frameName)
         {
             case "x":
                 _curVerifParams.R = new Random().NextBigInteger(1, _protocolData.Modulo);
@@ -104,22 +106,27 @@ internal class Client
                 responseValue = _curVerifParams.X;
                 break;
             case "y":
-                _curVerifParams.E = BigInteger.Parse(requestedValueParam!);
+                _curVerifParams.E = (BigInteger)message.Frames["e"];
                 _curVerifParams.Y = _curVerifParams.R * BigInteger.ModPow(_protocolData.PrivateKey, _curVerifParams.E, _protocolData.Modulo);
                 responseValue = _curVerifParams.Y;
                 break;
             default:
                 break;
         }
-        return MessagingHelper.ComposeMessageToServer(
-            "Value",
-            requestedValueName,
-            responseValue.ToString()); //сообщение)
+        var reponseMessage = new ValuedMessage(_protocolData.Name, "Server", MessageType.Default);
+        reponseMessage.Frames.Add(frameName, responseValue);
+
+        var responseMessageSerialized = JsonConvert.SerializeObject(reponseMessage);
+        return MessagingHelper.ComposeMessageToServer(responseMessageSerialized);
     }
     object printLock = new object();
-    void PrintMessage(ReceivedMessage message)
+    void PrintMessage(ValuedMessage message)
     {
-        Print($"{message.Sender}: {message.Message}", true);
+        foreach(var frame in message.Frames)
+        {
+            Print($"{message.Sender}: {frame.Key} = {frame.Value}", true);
+        }
+        
     }
     void Print(string message, bool addNewLine)
     {
