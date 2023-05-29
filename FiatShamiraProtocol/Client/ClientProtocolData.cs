@@ -14,13 +14,16 @@ public class ClientProtocolData
         _name = name;
     }
     public string Name => _name;
-    public BigInteger Modulo => _modulo;    
+    public BigInteger Modulo
+    {
+        get => _modulo;
+        set => _modulo = value; 
+    }   
     public BigInteger PublicKey => _publicKey;
     public BigInteger PrivateKey => _privateKey;    
 
-    public void GenerateKeys(BigInteger modulo)
+    public void GenerateKeys()
     {
-        _modulo = modulo;
         GeneratePrivateKey();
         GeneratePublicKey();
     }

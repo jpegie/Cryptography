@@ -5,5 +5,5 @@ public enum MessageType
     Registration = 1,
     Verification = 2,
     Default = 3,
-    Value = 4
+    Modulo = 4
 }

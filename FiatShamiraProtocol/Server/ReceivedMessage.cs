@@ -67,12 +67,15 @@ public class ValuedMessage : IMessage
         _sender = _receiver;
         _receiver = buff;
     }
-    public ValuedMessage Clone()
+    public ValuedMessage Clone(bool withFrames = true)
     {
         var clone = new ValuedMessage(_sender, _receiver, _messageType);
-        foreach(var frame in _frames)
+        if (withFrames)
         {
-            clone.AddFrame(frame.Key, frame.Value);
+            foreach (var frame in _frames)
+            {
+                clone.AddFrame(frame.Key, frame.Value);
+            }
         }
         return clone;
     }

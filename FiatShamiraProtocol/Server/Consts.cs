@@ -14,6 +14,7 @@ public static class FramesNames
     public const string PUBLIC_KEY = "PublicKey";
     public const string STATUS = "Status";
     public const string ROUND = "Round";
+    public const string MODULO = "Modulo";
     public const string X = "x";
     public const string Y = "y";
     public const string E = "e";

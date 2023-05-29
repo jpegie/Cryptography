@@ -16,6 +16,7 @@ internal class Client
     VerificationParams _curVerifParams;
     Task _requestingMessageTask;
     bool _isRegistered = false;
+    bool _gotMoodulo = false;
     List<BigInteger> _xVerifHistory;
 
     public Client(string name)
@@ -23,7 +24,6 @@ internal class Client
         _xVerifHistory = new List<BigInteger>();
         _curVerifParams = new VerificationParams();
         _protocolData = new ClientProtocolData(name);
-        _protocolData.GenerateKeys(493); //28*17 
         _socket = new DealerSocket();
         _socket.Options.Identity = Encoding.UTF8.GetBytes(name);
         _socket.Connect($"{Consts.SERVER_HOST}:{Consts.PORT}");
@@ -33,6 +33,16 @@ internal class Client
         _poller = new NetMQPoller { _socket };
     }
     public string Name => _protocolData.Name;
+    private void RequestForModulo()
+    {
+        var requestMessage = new ValuedMessage(
+            _protocolData.Name,
+            Consts.SERVER_IDENTITY,
+            MessageType.Modulo);
+        var requestMessageSerialized = MessagingHelper.SerializeMessage(requestMessage);
+        var messageForServer = MessagingHelper.ComposeMessageToServer(requestMessageSerialized);
+        MessagingHelper.TrySendMessage(_socket, messageForServer);
+    }
     private void Register()
     {
         var registerMessage = new ValuedMessage(
@@ -50,6 +60,8 @@ internal class Client
     {
         _requestingMessageTask = new Task(() =>
         {
+            RequestForModulo();
+            while (!_gotMoodulo) { } //кручусь пока не получу модуль от сервера для дальнейшей регистрации
             Register();
             while (true)
             {
@@ -77,8 +89,14 @@ internal class Client
         switch (message!.Type)
         {
             case MessageType.Verification:
-                NetMQMessage responseMessage = ComposeResponseValuedMessage(message);
+                var responseMessage = ComposeResponseValuedMessage(message);
                 MessagingHelper.TrySendMessage(e.Socket, responseMessage);
+                break;
+            case MessageType.Modulo:
+                var modulo = BigInteger.Parse(message.Frames[FramesNames.MODULO].ToString()!);
+                _protocolData.Modulo = modulo;
+                _protocolData.GenerateKeys();
+                _gotMoodulo = true;
                 break;
             case MessageType.Registration:
                 if (message.Frames[FramesNames.STATUS].ToString() == "Registration completed")

@@ -34,30 +34,36 @@ internal class TrustedServer
     private void HandleReceivingMessage(NetMQMessage message)
     {
         var clientMessage = MessagingHelper.ParseValuedMessage(message);
-        if (clientMessage!.Type == MessageType.Registration)
+        switch (clientMessage!.Type)
         {
-            RegisterClient(clientMessage);
-        }
-        else
-        {
-            //на время верификации обработка сообщений отдается полностью методу VerifySenderGenuine
-            var isUserVerified = VerifySenderGenuine(clientMessage);
-            var reponseMessageToSender = clientMessage.Clone();
-            if (isUserVerified)
-            {
-                reponseMessageToSender.UpdateMessageFrame($"You are actual '{clientMessage.Sender}'");
-                MessagingHelper.Response(_socket, reponseMessageToSender, responseBy: Consts.SERVER_IDENTITY);
-                //отправка сообщения получателю
-                var messageToClient = MessagingHelper.ComposeMessage(
-                    clientMessage.Receiver, 
-                    MessagingHelper.SerializeMessage(clientMessage));
-                MessagingHelper.TrySendMessage(_socket, messageToClient);
-            }
-            else
-            {
-                reponseMessageToSender.UpdateMessageFrame($"You are dickhead, but not '{reponseMessageToSender.Sender}'");
-                MessagingHelper.Response(_socket, reponseMessageToSender, responseBy: Consts.SERVER_IDENTITY);
-            }
+            case MessageType.Registration:
+                RegisterClient(clientMessage);
+                break;
+            case MessageType.Modulo:
+                var responseMessage = clientMessage.Clone(withFrames: false);
+                responseMessage.AddFrame(FramesNames.MODULO, _modulo);
+                MessagingHelper.Response(_socket, responseMessage, responseBy: Consts.SERVER_IDENTITY);
+                break;
+            case MessageType.Default:
+                //на время верификации обработка сообщений отдается полностью методу VerifySenderGenuine
+                var isUserVerified = VerifySenderGenuine(clientMessage);
+                var reponseMessageToSender = clientMessage.Clone();
+                if (isUserVerified)
+                {
+                    reponseMessageToSender.UpdateMessageFrame($"You are actual '{clientMessage.Sender}'");
+                    MessagingHelper.Response(_socket, reponseMessageToSender, responseBy: Consts.SERVER_IDENTITY);
+                    //отправка сообщения получателю
+                    var messageToClient = MessagingHelper.ComposeMessage(
+                        clientMessage.Receiver,
+                        MessagingHelper.SerializeMessage(clientMessage));
+                    MessagingHelper.TrySendMessage(_socket, messageToClient);
+                }
+                else
+                {
+                    reponseMessageToSender.UpdateMessageFrame($"You are dickhead, but not '{reponseMessageToSender.Sender}'");
+                    MessagingHelper.Response(_socket, reponseMessageToSender, responseBy: Consts.SERVER_IDENTITY);
+                }
+                break;
         }
     }
 
