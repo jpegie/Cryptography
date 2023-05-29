@@ -30,7 +30,7 @@ public class ClientProtocolData
     private void GeneratePrivateKey()
     {
         var isPrivateKeyFound = false;
-        var buffPrivateKey = new Random().NextBigInteger(1, 100); //генерация начальной точки
+        var buffPrivateKey = new Random().NextBigInteger(1, _modulo/4); //генерация начальной точки
 
         while (!isPrivateKeyFound && buffPrivateKey < _modulo)
         {
