@@ -12,18 +12,21 @@ internal class TrustedServer
 {
     RouterSocket _socket;
     Dictionary<string, BigInteger> _registratedUsers;
-    BigInteger _modulo;
+    BigInteger _modulo, _p, _q;
 
-    public TrustedServer()
+    public TrustedServer(BigInteger p, BigInteger q)
     {
+        _p = p; 
+        _q = q;
+        _modulo = _p * _q;
         _socket = new RouterSocket($"@{Consts.SERVER_HOST}:{Consts.PORT}");
         _socket.Options.Identity = Encoding.UTF8.GetBytes(Consts.SERVER_IDENTITY);
         _socket.Options.RouterHandover = true;
         _registratedUsers = new Dictionary<string, BigInteger>();
-        _modulo = 29 * 17;
     }
     public void StartReceiving()
     {
+        Console.WriteLine("Server started...");
         while (true)
         {
             var message = _socket.ReceiveMultipartMessage();
