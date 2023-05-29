@@ -2,12 +2,13 @@
 public static class PrintHelper
 {
     static object printLock = new object();
-    public static void PrintMessage(ValuedMessage message)
+    public static void PrintMessage(SignedMessage message)
     {
         Print("@Ding-ding! Received message!@", true);
-        foreach (var frame in message.Frames)
+        Print($"Original hash: {message.Hash}", true);
+        foreach (var frame in message.Value.Frames)
         {
-            Print($"{message.Sender}: {frame.Key} = {frame.Value}", true);
+            Print($"{message.Value.Sender}: {frame.Key} = {frame.Value}", true);
         }
 
     }
