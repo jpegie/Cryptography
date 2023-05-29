@@ -16,12 +16,14 @@ internal class Client
     VerificationParams _curVerifParams;
     Task _requestingMessageTask;
     bool _isRegistered = false;
+    List<BigInteger> _xVerifHistory;
 
     public Client(string name)
     {
+        _xVerifHistory = new List<BigInteger>();
         _curVerifParams = new VerificationParams();
         _protocolData = new ClientProtocolData(name);
-        _protocolData.GenerateKeys(29 * 17);
+        _protocolData.GenerateKeys(493); //28*17 
         _socket = new DealerSocket();
         _socket.Options.Identity = Encoding.UTF8.GetBytes(name);
         _socket.Connect($"{Consts.SERVER_HOST}:{Consts.PORT}");
@@ -35,7 +37,7 @@ internal class Client
     {
         var registerMessage = new ValuedMessage(
             _protocolData.Name, 
-            Consts.SERVER_IDENTITY, 
+            Consts.SERVER_IDENTITY, //кому сообщение
             MessageType.Registration);
         registerMessage.AddFrame(FramesNames.PUBLIC_KEY, _protocolData.PublicKey);
 
@@ -54,6 +56,7 @@ internal class Client
                 if (_isRegistered)
                 {
                     Thread.Sleep(1000);
+                    _xVerifHistory.Clear(); //очистка истории X, т.к. для верификации нужны уникальные и каждая верификация уникальна на каждое сообщение
                     var newMessage = ParseNewMessageFromConsole();
                     var newMessageSerialized = MessagingHelper.SerializeMessage(newMessage);
                     var message = MessagingHelper.ComposeMessageToServer(newMessageSerialized);
@@ -107,12 +110,20 @@ internal class Client
         foreach (var frame in message.Frames)
         {
             var frameName = frame.Key;
-
+            var xFound = false;
             switch (frameName)
             {
                 case FramesNames.X:
-                    _curVerifParams.R = new Random().NextBigInteger(1, _protocolData.Modulo);
-                    _curVerifParams.X = BigInteger.ModPow(_curVerifParams.R, 2, _protocolData.Modulo);
+                    while (!xFound)
+                    {
+                        _curVerifParams.R = new Random().NextBigInteger(1, _protocolData.Modulo);
+                        _curVerifParams.X = BigInteger.ModPow(_curVerifParams.R, 2, _protocolData.Modulo);
+                        if (!_xVerifHistory.Contains(_curVerifParams.X))
+                        {
+                            xFound = true;
+                            _xVerifHistory.Add(_curVerifParams.X);
+                        }
+                    }
                     responseValue = _curVerifParams.X;
                     break;
                 case FramesNames.Y:
