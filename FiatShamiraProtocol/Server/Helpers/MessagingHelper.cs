@@ -4,9 +4,13 @@ using Newtonsoft.Json;
 namespace Server.Helpers;
 public static class MessagingHelper
 {
-    public static void Response(NetMQSocket socket, ValuedMessage messageToResponseTo)
+    public static void Response(NetMQSocket socket, ValuedMessage messageToResponseTo, string responseBy = "")
     {
-        var responseMessage = ComposeMessage(messageToResponseTo.Sender, SerializeMessage(messageToResponseTo));
+        var sendingMessage = messageToResponseTo.Clone();
+        var receiver = sendingMessage.Sender;
+        var sender = responseBy == "" ? sendingMessage.Sender : responseBy;
+        sendingMessage.Sender = sender;
+        var responseMessage = ComposeMessage(receiver, SerializeMessage(sendingMessage));
         TrySendMessage(socket, responseMessage);
     }
 

@@ -70,10 +70,10 @@ internal class Client
     {
         var receivedMessage = e.Socket.ReceiveMultipartMessage();
         var message = MessagingHelper.ParseValuedMessage(receivedMessage);
+        PrintHelper.PrintMessage(message!);
         switch (message!.Type)
         {
             case MessageType.Verification:
-                //Print($"[VRound #{-1}] Request for <{-1}>...", true);
                 NetMQMessage responseMessage = ComposeResponseValuedMessage(message);
                 MessagingHelper.TrySendMessage(e.Socket, responseMessage);
                 break;
@@ -82,12 +82,10 @@ internal class Client
                 {
                     _isRegistered = true;
                 }
-                PrintHelper.PrintMessage(message);
                 break;
             case MessageType.Default:
-                PrintHelper.PrintMessage(message);
                 break;
-        }
+        }  
     }
     private ValuedMessage ParseNewMessageFromConsole()
     {

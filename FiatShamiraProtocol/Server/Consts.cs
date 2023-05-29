@@ -1,4 +1,6 @@
-﻿namespace Server;
+﻿using System.Dynamic;
+
+namespace Server;
 public static class Consts
 {
     public const string SERVER_IDENTITY = "Server";
@@ -11,6 +13,7 @@ public static class FramesNames
     public const string MESSAGE = "Message";
     public const string PUBLIC_KEY = "PublicKey";
     public const string STATUS = "Status";
+    public const string ROUND = "Round";
     public const string X = "x";
     public const string Y = "y";
     public const string E = "e";

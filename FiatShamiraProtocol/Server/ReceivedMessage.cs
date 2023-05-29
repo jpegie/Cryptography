@@ -1,4 +1,6 @@
-﻿namespace Server;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Server;
 public interface IMessage
 {
     public MessageType Type { get; set; }
@@ -39,6 +41,17 @@ public class ValuedMessage : IMessage
     public void AddFrame(string name, object value)
     {
         _frames[name] = value;   
+    }
+    public void ClearFrames(string excludeFrame = "")
+    {
+        foreach(var frame in _frames)
+        {
+            if (frame.Key == excludeFrame)
+            {
+                continue;
+            }
+            _frames.Remove(frame.Key);
+        }
     }
     public void AddFrameAsRequestingValue(string name)
     {
