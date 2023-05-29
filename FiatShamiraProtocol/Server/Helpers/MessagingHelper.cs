@@ -1,15 +1,12 @@
 ﻿using NetMQ;
 using Newtonsoft.Json;
-using System.ServiceModel.Channels;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Server.Helpers;
 public static class MessagingHelper
 {
     public static void Response(NetMQSocket socket, ValuedMessage messageToResponseTo)
     {
-        var responseMessage = ComposeMessage(messageToResponseTo.Sender, JsonConvert.SerializeObject(messageToResponseTo));
+        var responseMessage = ComposeMessage(messageToResponseTo.Sender, SerializeMessage(messageToResponseTo));
         TrySendMessage(socket, responseMessage);
     }
 
@@ -24,7 +21,7 @@ public static class MessagingHelper
     }
     public static NetMQMessage ComposeMessageToServer(params string[] list)
     {
-        var serverParam = new string[] { "Server" };
+        var serverParam = new string[] { Consts.SERVER_IDENTITY };
         list = serverParam.Concat(list).ToArray();
         return ComposeMessage(list);
     }
@@ -38,22 +35,9 @@ public static class MessagingHelper
         var deserializedMessage = message[messageFrameIndex].ConvertToString();
         return JsonConvert.DeserializeObject<ValuedMessage>(deserializedMessage);
     }
-
-    /*
-     * public const int
-        SERVER_PUBLICKEY = -1,
-        SENDER_INDEX = 0,
-        RECEIVER_INDEX = 1,
-        MESSAGE_INDEX = 2,
-        PUBLICKEY_INDEX = 3;
-    public const string
-        SERVER_NAME = "Server",
-        REGISTRATION = "Registration";
-    public ReceivedMessage(NetMQMessage message)
+    public static string SerializeMessage(ValuedMessage message)
     {
-        SenderFrame = message[SENDER_INDEX];
-        ReceiverFrame = message[RECEIVER_INDEX];
-        MessageFrame = message[MESSAGE_INDEX];
-     */
+        return JsonConvert.SerializeObject(message);
+    }
 }
 

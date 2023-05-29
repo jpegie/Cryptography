@@ -38,7 +38,7 @@ public class ValuedMessage : IMessage
     public Dictionary<string, object> Frames => _frames;
     public void AddFrame(string name, object value)
     {
-        _frames.Add(name, value);   
+        _frames[name] = value;   
     }
     public void AddFrameAsRequestingValue(string name)
     {
@@ -46,14 +46,7 @@ public class ValuedMessage : IMessage
     }
     public void UpdateMessageFrame(string message) 
     {
-        if (_frames.ContainsKey("Message"))
-        {
-            _frames["Message"] = message;
-        }
-        else
-        {
-            _frames.Add("Message", message);
-        }
+        _frames[FramesNames.MESSAGE] = message;
     }
     public void SwapSenderWithReceiver()
     {
@@ -71,12 +64,5 @@ public class ValuedMessage : IMessage
         return clone;
     }
 }
-
-/*public class MessageFrame
-{
-    public string Name { get; set; } = "";
-    public object? ValueProperty { get; set; } = null;
-    public object? Parameter { get; set; } = null;  
-}*/
 
 

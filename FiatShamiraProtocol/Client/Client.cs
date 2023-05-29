@@ -17,14 +17,14 @@ internal class Client
     Task _requestingMessageTask;
     bool _isRegistered = false;
 
-    public Client(string name, int port = 12346)
+    public Client(string name)
     {
         _curVerifParams = new VerificationParams();
         _protocolData = new ClientProtocolData(name);
         _protocolData.GenerateKeys(29 * 17);
         _socket = new DealerSocket();
         _socket.Options.Identity = Encoding.UTF8.GetBytes(name);
-        _socket.Connect($"tcp://127.0.0.1:{port}");
+        _socket.Connect($"{Consts.SERVER_HOST}:{Consts.PORT}");
         _socket.ReceiveReady += HandleReceivingMessage!;
         //событие ReceiveReady отрабатывает только через пуллер,
         //поэтому нужно создать его с прослушкой одного сокета - текущего
@@ -33,10 +33,13 @@ internal class Client
     public string Name => _protocolData.Name;
     private void Register()
     {
-        var registerMessage = new ValuedMessage(_protocolData.Name, "Server", MessageType.Registration);
-        registerMessage.AddFrame("PublicKey", _protocolData.PublicKey);
+        var registerMessage = new ValuedMessage(
+            _protocolData.Name, 
+            Consts.SERVER_IDENTITY, 
+            MessageType.Registration);
+        registerMessage.AddFrame(FramesNames.PUBLIC_KEY, _protocolData.PublicKey);
 
-        var registerMessageSerialized = JsonConvert.SerializeObject(registerMessage);
+        var registerMessageSerialized = MessagingHelper.SerializeMessage(registerMessage);
         var messageForServer = MessagingHelper.ComposeMessageToServer(registerMessageSerialized);
         MessagingHelper.TrySendMessage(_socket, messageForServer);
     }
@@ -52,7 +55,7 @@ internal class Client
                 {
                     Thread.Sleep(1000);
                     var newMessage = ParseNewMessageFromConsole();
-                    var newMessageSerialized = JsonConvert.SerializeObject(newMessage);
+                    var newMessageSerialized = MessagingHelper.SerializeMessage(newMessage);
                     var message = MessagingHelper.ComposeMessageToServer(newMessageSerialized);
                     MessagingHelper.TrySendMessage(_socket, message);
                     Thread.Sleep(1000);
@@ -75,7 +78,7 @@ internal class Client
                 MessagingHelper.TrySendMessage(e.Socket, responseMessage);
                 break;
             case MessageType.Registration:
-                if (message.Frames["Status"].ToString() == "Registration completed")
+                if (message.Frames[FramesNames.STATUS].ToString() == "Registration completed")
                 {
                     _isRegistered = true;
                 }
@@ -99,20 +102,23 @@ internal class Client
     private NetMQMessage ComposeResponseValuedMessage(ValuedMessage message)
     {
         var responseValue = new BigInteger(0);
-        var reponseMessage = new ValuedMessage(_protocolData.Name, "Server", MessageType.Default);
+        var reponseMessage = new ValuedMessage(
+            _protocolData.Name, 
+            Consts.SERVER_IDENTITY, 
+            MessageType.Default);
         foreach (var frame in message.Frames)
         {
             var frameName = frame.Key;
 
             switch (frameName)
             {
-                case "x":
+                case FramesNames.X:
                     _curVerifParams.R = new Random().NextBigInteger(1, _protocolData.Modulo);
                     _curVerifParams.X = BigInteger.ModPow(_curVerifParams.R, 2, _protocolData.Modulo);
                     responseValue = _curVerifParams.X;
                     break;
-                case "y":
-                    _curVerifParams.E = BigInteger.Parse(message.Frames["e"].ToString()!);
+                case FramesNames.Y:
+                    _curVerifParams.E = BigInteger.Parse(message.Frames[FramesNames.E].ToString()!);
                     _curVerifParams.Y = _curVerifParams.R * BigInteger.ModPow(_protocolData.PrivateKey, _curVerifParams.E, _protocolData.Modulo);
                     responseValue = _curVerifParams.Y;
                     break;
@@ -121,7 +127,7 @@ internal class Client
             }
             reponseMessage.Frames[frameName] = responseValue;
         }
-        var responseMessageSerialized = JsonConvert.SerializeObject(reponseMessage);
+        var responseMessageSerialized = MessagingHelper.SerializeMessage(reponseMessage);
         return MessagingHelper.ComposeMessageToServer(responseMessageSerialized);
     }
 }

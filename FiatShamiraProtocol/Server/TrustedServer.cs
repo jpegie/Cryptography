@@ -14,10 +14,10 @@ internal class TrustedServer
     Dictionary<string, BigInteger> _registratedUsers;
     BigInteger _modulo;
 
-    public TrustedServer(int port = 12346)
+    public TrustedServer()
     {
-        _socket = new RouterSocket($"@tcp://127.0.0.1:{port}");
-        _socket.Options.Identity = Encoding.UTF8.GetBytes("Server");
+        _socket = new RouterSocket($"@{Consts.SERVER_HOST}:{Consts.PORT}");
+        _socket.Options.Identity = Encoding.UTF8.GetBytes(Consts.SERVER_IDENTITY);
         _socket.Options.RouterHandover = true;
         _registratedUsers = new Dictionary<string, BigInteger>();
         _modulo = 29 * 17;
@@ -43,7 +43,6 @@ internal class TrustedServer
             //на время верификации обработка сообщений отдается полностью методу VerifySenderGenuine
             var isUserVerified = VerifySenderGenuine(clientMessage);
             var reponseMessageToSender = clientMessage.Clone();
-
             if (isUserVerified)
             {
                 reponseMessageToSender.UpdateMessageFrame($"You are actual '{clientMessage.Sender}'");
@@ -51,12 +50,11 @@ internal class TrustedServer
                 //отправка сообщения получателю
                 var messageToClient = MessagingHelper.ComposeMessage(
                     clientMessage.Receiver, 
-                    JsonConvert.SerializeObject(clientMessage));
+                    MessagingHelper.SerializeMessage(clientMessage));
                 MessagingHelper.TrySendMessage(_socket, messageToClient);
             }
             else
             {
-
                 reponseMessageToSender.UpdateMessageFrame($"You are dickhead, but not '{reponseMessageToSender.Sender}'");
                 MessagingHelper.Response(_socket, reponseMessageToSender);
             }
@@ -73,23 +71,23 @@ internal class TrustedServer
         verificationMessage.UpdateMessageFrame("Verification started...");
         MessagingHelper.Response(_socket, verificationMessage);
         verificationMessage.Type = MessageType.Verification;
-        for (int round_i = 0; round_i < 40; ++round_i)
+        for (int round_i = 0; round_i < Consts.VERIFICATION_ROUNDS_AMOUNT; ++round_i)
         {
             verificationMessage.Frames.Clear();
-            verificationMessage.AddFrameAsRequestingValue("x"); //добавляю X как запрос
+            verificationMessage.AddFrameAsRequestingValue(FramesNames.X); //добавляю X как запрос
             MessagingHelper.Response(_socket, verificationMessage); //отправка запроса на получение значения <x>
             var x = MessagingHelper.ParseValuedMessage(_socket.ReceiveMultipartMessage()); //получение <x> ответвым сообщением
 
             verificationMessage.Frames.Clear();
             var e = RandomNumberGenerator.GetInt32(0, 2); //генерация <e>
-            verificationMessage.AddFrameAsRequestingValue("y"); //y как запрос
-            verificationMessage.AddFrame("e", e); //добавляю e как параметр
+            verificationMessage.AddFrameAsRequestingValue(FramesNames.Y); //y как запрос
+            verificationMessage.AddFrame(FramesNames.E, e); //добавляю e как параметр
             MessagingHelper.Response(_socket, verificationMessage); //отправка запроса на получение значения <x>
             
             var y = MessagingHelper.ParseValuedMessage(_socket.ReceiveMultipartMessage()); //получение <y> ответвым сообщением
             
-            var yValue = BigInteger.Parse(y!.Frames["y"].ToString()!);
-            var xValue = BigInteger.Parse(x!.Frames["x"].ToString()!);
+            var yValue = BigInteger.Parse(y!.Frames[FramesNames.Y].ToString()!);
+            var xValue = BigInteger.Parse(x!.Frames[FramesNames.X].ToString()!);
 
             if (yValue == 0)
             {
@@ -116,8 +114,8 @@ internal class TrustedServer
     public void RegisterClient(ValuedMessage message)
     {
         if (!_registratedUsers.ContainsKey(message.Sender))
-            _registratedUsers.Add(message.Sender, BigInteger.Parse(message.Frames["PublicKey"].ToString()!));
-        message.AddFrame("Status", "Registration completed");
+            _registratedUsers.Add(message.Sender, BigInteger.Parse(message.Frames[FramesNames.PUBLIC_KEY].ToString()!));
+        message.AddFrame(FramesNames.STATUS, "Registration completed");
         MessagingHelper.Response(_socket, message);
     }
 }
