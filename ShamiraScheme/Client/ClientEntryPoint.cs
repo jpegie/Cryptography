@@ -1,4 +1,7 @@
-﻿namespace Client;
+﻿using Server.Helpers;
+using System.Diagnostics;
+
+namespace Client;
 class ClientEntryPoint
 {
     static void Main(string[] args)

