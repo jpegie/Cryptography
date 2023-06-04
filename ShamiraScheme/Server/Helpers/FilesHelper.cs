@@ -3,7 +3,7 @@
 namespace Server.Helpers;
 public class FilesHelper
 {
-    public static bool WriteData(string fileName, string dirPath, byte[] data)
+    public static bool WriteData(string fileName, string dirPath, byte[] data, bool asHex = true)
     {
         try
         {
@@ -12,8 +12,15 @@ public class FilesHelper
                 Directory.CreateDirectory(dirPath);
             }
             var filePath = Path.Combine(dirPath, fileName);
-            File.WriteAllBytes(filePath, data);
-
+            if (asHex)
+            {
+                var hex = Convert.ToHexString(data);
+                File.WriteAllText(filePath, hex);
+            }
+            else
+            {
+                File.WriteAllBytes(filePath, data);
+            }
             PrintHelper.Print($"Data succesfully written into '{filePath}'", true);
             return true;
         }
@@ -22,9 +29,17 @@ public class FilesHelper
             return false;
         }
     }
-    public static byte[] ReadFile(string filePath)
+    public static byte[] ReadFile(string filePath, bool asHex = false)
     {
-        return File.ReadAllBytes(filePath);
+        if (asHex)
+        {
+            var hex = File.ReadAllText(filePath);
+            return Convert.FromHexString(hex);
+        }
+        else
+        {
+            return File.ReadAllBytes(filePath);
+        }
     }
     public static void SaveFile(byte[] data)
     {

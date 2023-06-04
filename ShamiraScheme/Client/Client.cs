@@ -164,12 +164,12 @@ internal class Client
                 _mySavedKey = message.Frames[FramesNames.Key].ToString()!;
                 break;
             case MessageType.Encrypt:
-                var encryptedDataValue = Convert.FromBase64String(message.Frames[FramesNames.Data].ToString()!);
+                var encryptedDataValue = Convert.FromHexString(message.Frames[FramesNames.Data].ToString()!);
                 FilesHelper.WriteData(ENCRYPTED_FILENAME, _filesDirectory, encryptedDataValue);
                 break;
             case MessageType.Decrypt:
-                var decryptedDataValue = Convert.FromBase64String(message.Frames[FramesNames.Data].ToString()!);
-                FilesHelper.WriteData(DECRYPTED_FILENAME, _filesDirectory, decryptedDataValue);
+                var decryptedDataValue = Convert.FromHexString(message.Frames[FramesNames.Data].ToString()!);
+                FilesHelper.WriteData(DECRYPTED_FILENAME, _filesDirectory, decryptedDataValue, asHex: false);
                 break;
             case MessageType.Default:
                 break;
@@ -198,16 +198,16 @@ internal class Client
         int total = int.Parse(totalUsers);
         int required = int.Parse(requiredUsers);
 
-        var data = FilesHelper.ReadFile(filePath);
+        var data = Convert.ToHexString(FilesHelper.ReadFile(filePath));
         var message = new ValuedMessage(_protocolData.Name, Consts.SERVER_IDENTITY, MessageType.Encrypt);
-        message.AddFrame(FramesNames.Data, data.ToArray());
+        message.AddFrame(FramesNames.Data, data);
         message.AddFrame(FramesNames.Players, total);
         message.AddFrame(FramesNames.Required, required);
         return message;
     }
     private ValuedMessage ParseMessageForDecryptFromFile(string filePath)
     {
-        var data = FilesHelper.ReadFile(filePath);
+        var data = Convert.ToHexString(FilesHelper.ReadFile(filePath, asHex: true));
         var message = new ValuedMessage(_protocolData.Name, Consts.SERVER_IDENTITY, MessageType.Decrypt);
         message.AddFrame(FramesNames.Data, data);
         return message;

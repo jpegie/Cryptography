@@ -72,14 +72,14 @@ internal class TrustedServer
                 byte[] encryptedMessage = EncryptClientMessage(clientMessage);
                 responseMessageToSender = clientMessage.Clone(withFrames: false);
                 responseMessageToSender.Type = MessageType.Encrypt;
-                responseMessageToSender.AddFrame(FramesNames.Data, encryptedMessage);
+                responseMessageToSender.AddFrame(FramesNames.Data, Convert.ToHexString(encryptedMessage));
                 MessagingHelper.Response(_socket, responseMessageToSender, responseBy: Consts.SERVER_IDENTITY);
                 break;
             case MessageType.Decrypt:
                 byte[] decryptedMessage = DecryptClientMessage(clientMessage);
                 responseMessageToSender = clientMessage.Clone(withFrames: false);
                 responseMessageToSender.Type = MessageType.Decrypt;
-                responseMessageToSender.AddFrame(FramesNames.Data, decryptedMessage);
+                responseMessageToSender.AddFrame(FramesNames.Data, Convert.ToHexString(decryptedMessage));
                 MessagingHelper.Response(_socket, responseMessageToSender, responseBy: Consts.SERVER_IDENTITY);
                 break;
         }
@@ -94,16 +94,24 @@ internal class TrustedServer
         var byteKey = KeyGenerator.GenerateKey(polynomsCount * 16);
         var key = KeyGenerator.GenerateDoubleBytesKey(byteKey);
         var hexKey = KeyGenerator.GetHexKey(key);
-        byte[] message = Convert.FromBase64String(clientMessage.Frames[FramesNames.Data].ToString()!);
+        byte[] message = Convert.FromHexString(clientMessage.Frames[FramesNames.Data].ToString()!);
         ShareKeys(key, players, required);
         return Encryption.Encrypt(message, hexKey);
     }
     private byte[] DecryptClientMessage(ValuedMessage clientMessage)
     {
-        var dataToDecrypt = Convert.FromBase64String(clientMessage.Frames[FramesNames.Data].ToString()!);
+        var dataToDecrypt = Convert.FromHexString(clientMessage.Frames[FramesNames.Data].ToString()!);
         var shares = new string[_sharesCount];
-        var recievers = _registratedUsers.Keys.ToList();
-        recievers.Insert(0, clientMessage.Sender);
+
+        var recievers = new List<string> { clientMessage.Sender };
+        foreach(var reciever in _registratedUsers.Keys)
+        {
+            if (!recievers.Contains(reciever))
+            {
+                recievers.Add(reciever);
+            }
+        }
+
         var requestKeyMessage = new ValuedMessage(
             Consts.SERVER_IDENTITY,
             "",
