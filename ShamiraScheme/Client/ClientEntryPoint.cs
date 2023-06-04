@@ -17,6 +17,10 @@ class ClientEntryPoint
         {
             serverIp = Consts.LOCALHOST;
         }
+        else if (!serverIp.StartsWith("tcp://"))
+        {
+            serverIp = "tcp://" + serverIp;
+        }
         var user = new Client(userName, filesDir, serverIp);
 
         user.Start();
