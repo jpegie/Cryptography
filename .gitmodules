@@ -1,0 +1,3 @@
+[submodule "ShamiraScheme/shamir-secret-sharing"]
+	path = ShamiraScheme/shamir-secret-sharing
+	url = https://github.com/jpegie/Cryptography/tree/main
