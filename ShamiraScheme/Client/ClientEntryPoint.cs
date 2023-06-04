@@ -6,10 +6,6 @@ class ClientEntryPoint
 {
     static void Main(string[] args)
     {
-        ExecutionHelper.Execute("C:\\User1\\decrypted.data");
-        return;
-
-
         Console.Write("Username: ");
         var userName = Console.ReadLine()!;
         Console.Write("Directory for saving files: ");
