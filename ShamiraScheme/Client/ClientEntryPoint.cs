@@ -1,4 +1,5 @@
-﻿using Server.Helpers;
+﻿using Server;
+using Server.Helpers;
 using System.Diagnostics;
 
 namespace Client;
@@ -10,7 +11,13 @@ class ClientEntryPoint
         var userName = Console.ReadLine()!;
         Console.Write("Directory for saving files: ");
         var filesDir = Console.ReadLine()!;
-        var user = new Client(userName, filesDir);
+        Console.Write("Server's IP: ");
+        var serverIp = Console.ReadLine()!;
+        if (serverIp == "")
+        {
+            serverIp = Consts.SERVER_HOST;
+        }
+        var user = new Client(userName, filesDir, serverIp);
 
         user.Start();
     }

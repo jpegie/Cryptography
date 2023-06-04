@@ -27,7 +27,7 @@ internal class Client
     bool _gotMoodulo = false;
     List<BigInteger> _xVerifHistory;
 
-    public Client(string name, string filesDirectory)
+    public Client(string name, string filesDirectory, string serverIP)
     {
         if (filesDirectory == "")
         {
@@ -42,7 +42,7 @@ internal class Client
         _protocolData = new ClientProtocolData(name);
         _socket = new DealerSocket();
         _socket.Options.Identity = Encoding.UTF8.GetBytes(name);
-        _socket.Connect($"{Consts.SERVER_HOST}:{Consts.PORT}");
+        _socket.Connect($"{serverIP}:{Consts.PORT}");
         _socket.ReceiveReady += HandleReceivingMessage!;
         //событие ReceiveReady отрабатывает только через пуллер,
         //поэтому нужно создать его с прослушкой одного сокета - текущего
