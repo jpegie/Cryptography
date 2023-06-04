@@ -11,6 +11,10 @@ class ServerEntryPoint
         {
             host = Consts.LOCALHOST;
         }
+        else if (host == "*")
+        {
+            host = Consts.ALL_HOST;
+        }
         Console.Write("p: ");
         var pStr = Console.ReadLine();
         var p = pStr == "" ? 1823 : BigInteger.Parse(pStr!);
