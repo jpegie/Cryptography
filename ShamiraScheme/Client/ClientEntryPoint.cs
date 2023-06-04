@@ -11,11 +11,11 @@ class ClientEntryPoint
         var userName = Console.ReadLine()!;
         Console.Write("Directory for saving files: ");
         var filesDir = Console.ReadLine()!;
-        Console.Write("Server's IP: ");
+        Console.Write("Server's IP (nothing for localhost): ");
         var serverIp = Console.ReadLine()!;
         if (serverIp == "")
         {
-            serverIp = Consts.SERVER_HOST;
+            serverIp = Consts.LOCALHOST;
         }
         var user = new Client(userName, filesDir, serverIp);
 

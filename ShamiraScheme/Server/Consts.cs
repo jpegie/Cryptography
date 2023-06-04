@@ -6,7 +6,7 @@ public static class Consts
     public const string SERVER_IDENTITY = "Server";
     public const int VERIFICATION_ROUNDS_AMOUNT = 40;
     public const int PORT = 12346;
-    public const string SERVER_HOST = "tcp://127.0.0.1";
+    public const string LOCALHOST = "tcp://localhost";
 }
 public static class FramesNames
 {

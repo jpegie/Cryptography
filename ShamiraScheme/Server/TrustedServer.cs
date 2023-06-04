@@ -15,12 +15,12 @@ internal class TrustedServer
     Dictionary<string, BigInteger> _registratedUsers;
     BigInteger _modulo, _p, _q;
     private int _sharesCount;
-    public TrustedServer(BigInteger p, BigInteger q)
+    public TrustedServer(BigInteger p, BigInteger q, string host)
     {
         _p = p; 
         _q = q;
         _modulo = _p * _q;
-        _socket = new RouterSocket($"@{Consts.SERVER_HOST}:{Consts.PORT}");
+        _socket = new RouterSocket($"@{host}:{Consts.PORT}");
         _socket.Options.Identity = Encoding.UTF8.GetBytes(Consts.SERVER_IDENTITY);
         _socket.Options.RouterHandover = true;
         _registratedUsers = new Dictionary<string, BigInteger>();
