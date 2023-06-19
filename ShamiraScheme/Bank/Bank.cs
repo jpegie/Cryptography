@@ -2,6 +2,7 @@
 using Server;
 using System.Numerics;
 using Server.Helpers;
+using System.ServiceModel.Channels;
 
 namespace Bank;
 
@@ -35,7 +36,7 @@ internal class Bank: Client.Client
     {
         _requestingMessageTask = new Task(() =>
         {
-            Register();
+            RegisterOnServer();
         }, TaskCreationOptions.LongRunning);
         _requestingMessageTask.Start();
         _poller.RunAsync();
@@ -66,7 +67,18 @@ internal class Bank: Client.Client
             case MessageType.BanknoteSigning:
                 SignBanknote(message);
                 break;
+            case MessageType.Modulo:
+                ResponseWithModulo(message);
+                break;
         }
+    }
+
+    public void ResponseWithModulo(ValuedMessage message)
+    {
+        var responseMessage = message.Clone(withFrames: false);
+        responseMessage.SwapSenderWithReceiver();
+        responseMessage.AddFrame(FramesNames.MODULO, _modulo);
+        MessagingHelper.SerializeThenSendMessageToServer(_socket, responseMessage);
     }
 
     public void RegisterUser(ValuedMessage message)

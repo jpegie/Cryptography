@@ -35,20 +35,12 @@ public class Client
     public string Name => _protocolData.Name;
     protected void RequestForModulo()
     {
-        var requestMessage = new ValuedMessage(
-            _protocolData.Name,
-            Consts.SERVER_IDENTITY,
-            MessageType.Modulo);
-        var requestMessageSerialized = MessagingHelper.SerializeMessage(requestMessage);
-        var messageForServer = MessagingHelper.ComposeMessageToServer(requestMessageSerialized);
-        MessagingHelper.TrySendMessage(_socket, messageForServer);
+        var requestMessage = new ValuedMessage(_protocolData.Name, Consts.BANK_IDENTITY, MessageType.Modulo);
+        MessagingHelper.SerializeThenSendMessageToServer(_socket, requestMessage);
     }
-    protected void Register()
+    protected void RegisterOnServer()
     {
-        var registerMessage = new ValuedMessage(
-            _protocolData.Name, 
-            Consts.SERVER_IDENTITY, //кому сообщение
-            MessageType.Registration);
+        var registerMessage = new ValuedMessage(_protocolData.Name, Consts.SERVER_IDENTITY, MessageType.Registration);
         registerMessage.AddFrame(FramesNames.PUBLIC_KEY, _protocolData.PublicKey);
 
         var registerMessageSerialized = MessagingHelper.SerializeMessage(registerMessage);
@@ -60,9 +52,7 @@ public class Client
     {
         _requestingMessageTask = new Task(() =>
         {
-            RequestForModulo();
-            while (!_gotMoodulo) { } //кручусь пока не получу модуль от сервера для дальнейшей регистрации
-            Register();
+            RegisterOnServer();
             while (true)
             {
                 if (_isRegistered)
@@ -79,6 +69,7 @@ public class Client
                     switch (inputOption)
                     {
                         case "0":
+                            RequestForModulo();
                             RegisterInBank();
                             break;
                         case "1":
