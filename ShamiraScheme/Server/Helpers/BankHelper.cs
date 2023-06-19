@@ -1,17 +1,5 @@
-﻿using BrendanGrant.Helpers.FileAssociation;
-using Server.Extensions;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.Mime;
-using System.Net.Sockets;
+﻿using Server.Extensions;
 using System.Numerics;
-using System.Reflection;
-using System.Security.Permissions;
-using System.Text;
-using System.Threading.Tasks;
-
 
 namespace Server.Helpers;
 public static class BankHelper

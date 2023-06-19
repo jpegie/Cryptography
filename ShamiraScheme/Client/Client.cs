@@ -8,16 +8,17 @@ using Newtonsoft.Json;
 using Server.Helpers;
 
 namespace Client;
-internal class Client
+public class Client
 {
-    DealerSocket _socket;
-    NetMQPoller _poller;
-    ClientProtocolData _protocolData;
-    Task _requestingMessageTask;
-    bool _isRegistered = false;
-    bool _gotMoodulo = false;
-    long _maxBanknoteValue = 21;
-    List<Banknote> _banknotes;
+    protected DealerSocket _socket;
+    protected NetMQPoller _poller;
+    protected ClientProtocolData _protocolData;
+    protected Task _requestingMessageTask;
+    protected bool _isRegistered = false;
+    protected bool _gotMoodulo = false;
+    protected long _maxBanknoteValue = 21;
+    protected List<Banknote> _banknotes;
+    private bool _isRegisteredInBank = false;
 
     public Client(string name, string serverIP)
     {
@@ -32,7 +33,7 @@ internal class Client
         _poller = new NetMQPoller { _socket };
     }
     public string Name => _protocolData.Name;
-    private void RequestForModulo()
+    protected void RequestForModulo()
     {
         var requestMessage = new ValuedMessage(
             _protocolData.Name,
@@ -42,7 +43,7 @@ internal class Client
         var messageForServer = MessagingHelper.ComposeMessageToServer(requestMessageSerialized);
         MessagingHelper.TrySendMessage(_socket, messageForServer);
     }
-    private void Register()
+    protected void Register()
     {
         var registerMessage = new ValuedMessage(
             _protocolData.Name, 
@@ -55,7 +56,7 @@ internal class Client
         MessagingHelper.TrySendMessage(_socket, messageForServer);
     }
 
-    public void Start()
+    public virtual void Start()
     {
         _requestingMessageTask = new Task(() =>
         {
@@ -68,86 +69,26 @@ internal class Client
                 {
                     Console.Write(
                         "\nOptions: " +
+                        "\n0 - register in bank" + 
                         "\n1 - buy banknote" +
                         "\n2 - buy somenting" +
                         "\n3 - verify banknote" + 
                         "\nInput: ");
                     var inputOption = Console.ReadLine(); PrintHelper.AddNewLine();
-                    var newMessageSerialized = "";
-                    var filePath = "";
-                    ValuedMessage newMessage;
-                    NetMQMessage message;
-
                     Thread.Sleep(1000);
                     switch (inputOption)
                     {
+                        case "0":
+                            RegisterInBank();
+                            break;
                         case "1":
-                            var banknote = BankHelper.ComposeBanknote(
-                                _protocolData.Modulo, 
-                                ExponentHelper.ComposeExponentFromValue(_maxBanknoteValue),
-                                _maxBanknoteValue);
-
-                            _banknotes.Add(banknote); //TODO: добавить какой-нибудь BanknotesProvider
-
-                            newMessage = new ValuedMessage(_protocolData.Name, Consts.SERVER_IDENTITY, MessageType.BanknoteRequest);
-                            newMessage.AddFrame(FramesNames.UNSIGNED_BANKNOTE, banknote.SMultR);
-                            newMessageSerialized = MessagingHelper.SerializeMessage(newMessage);
-                            message = MessagingHelper.ComposeMessageToServer(newMessageSerialized);
-                            MessagingHelper.TrySendMessage(_socket, message);
+                            BuyBanknote();
                             break;
                         case "2":
-                            PrintHelper.Print("Seller: ", false);
-                            var seller = Console.ReadLine()!;
-                            PrintHelper.Print("Using banknote index: ", false);
-                            var banknoteIndex = int.Parse(Console.ReadLine()!);
-                            PrintHelper.Print("Cost: ", false);
-                            var cost = long.Parse(Console.ReadLine()!);
-                            var change = _maxBanknoteValue - cost;
-                            newMessage = new ValuedMessage(_protocolData.Name, seller, MessageType.Payment);
-
-                            var realCost = BigInteger.Pow
-                            (
-                                BigInteger.Parse(_banknotes.ElementAt(banknoteIndex).Sign), //s_1 ^ (1/h)
-                                ExponentHelper.ComposeExponentFromValue(change) //s_1 ^ ((1/h) * change)
-                            ); //первая часть составного сообщения
-                           
-                            _banknotes.RemoveAt(banknoteIndex); //использованную банкноту удаляю
-
-                            var changeBanknote = BankHelper.ComposeBanknote
-                            (
-                                _protocolData.Modulo,
-                                ExponentHelper.ComposeExponentFromValue(change),
-                                change
-                             ); //вторая часть составного сообщения
-                           
-                            _banknotes.Add(changeBanknote); //сразу надо добавить в свою коллекцию банкнот
-
-                            newMessage.AddFrame(FramesNames.COST, realCost.ToString());
-                            newMessage.AddFrame(FramesNames.COST_VALUE, cost);
-                            newMessage.AddFrame(FramesNames.CHANGE_TO_SIGN, changeBanknote.SMultR);
-                            newMessage.AddFrame(FramesNames.CHANGE_VALUE, change);
-                            newMessageSerialized = MessagingHelper.SerializeMessage(newMessage);
-                            message = MessagingHelper.ComposeMessageToServer(newMessageSerialized);
-                            MessagingHelper.TrySendMessage(_socket, message);
+                            BuyProduct();
                             break;
                         case "3":
-                            PrintHelper.Print("Banknote index to verify: ", false);
-                            var index = int.Parse(Console.ReadLine()!);
-                            var banknoteToVerify = _banknotes[index];
-                            if (!banknoteToVerify.IsVerified)
-                            {
-                                newMessage = new ValuedMessage(_protocolData.Name, Consts.SERVER_IDENTITY, MessageType.BanknoteVerification);
-                                newMessage.AddFrame(FramesNames.BANKNOTE_TO_VERIFY, banknoteToVerify.SMultR);
-                                newMessage.AddFrame(FramesNames.SIGNED_BANKNOTE, ((BigInteger.Parse(banknoteToVerify.Sign) * BigInteger.Parse(banknoteToVerify.R)) % _protocolData.Modulo).ToString()); //верифицировать нужно с затемняющим множителем, т.к. банк сначала избавляется от него и потом подписывает S
-                                newMessage.AddFrame(FramesNames.BANKNOTE_VALUE, banknoteToVerify.Value);
-                                newMessageSerialized = MessagingHelper.SerializeMessage(newMessage);
-                                message = MessagingHelper.ComposeMessageToServer(newMessageSerialized);
-                                MessagingHelper.TrySendMessage(_socket, message);
-                            }
-                            else
-                            {
-                                PrintHelper.Print("Banknote already verified!", true);
-                            }
+                            VerifyBanknote();
                             break;
                     }
                     Thread.Sleep(1000);
@@ -157,8 +98,84 @@ internal class Client
         _requestingMessageTask.Start();
         _poller.RunAsync();
     }
+    private void RegisterInBank()
+    {
+        if (_isRegisteredInBank)
+        {
+            PrintHelper.Print("You are already registered in bank!", true);
+            return;
+        }
+        var registrationMessage = new ValuedMessage(_protocolData.Name, Consts.BANK_IDENTITY, MessageType.RegistrationInBank);
+        MessagingHelper.SerializeThenSendMessageToServer(_socket, registrationMessage);
+    }
+    private void BuyBanknote()
+    {
+        var banknote = BankHelper.ComposeBanknote(
+                                _protocolData.Modulo,
+                                ExponentHelper.ComposeExponentFromValue(_maxBanknoteValue),
+                                _maxBanknoteValue);
 
-    void HandleReceivingMessage(object sender, NetMQSocketEventArgs e)
+        _banknotes.Add(banknote); //TODO: добавить какой-нибудь BanknotesProvider
+
+        var requestMessage = new ValuedMessage(_protocolData.Name, Consts.BANK_IDENTITY, MessageType.BanknoteRequest);
+        requestMessage.AddFrame(FramesNames.BANKNOTE_TO_SIGN, banknote.SMultR);
+        requestMessage.AddFrame(FramesNames.BANKNOTE_TO_SIGN_VALUE, _maxBanknoteValue);
+        MessagingHelper.SerializeThenSendMessageToServer(_socket, requestMessage);
+    }
+    private void BuyProduct()
+    {
+        PrintHelper.Print("Seller: ", false);
+        var seller = Console.ReadLine()!;
+        PrintHelper.Print("Using banknote index: ", false);
+        var banknoteIndex = int.Parse(Console.ReadLine()!);
+        PrintHelper.Print("Cost: ", false);
+        var cost = long.Parse(Console.ReadLine()!);
+        var change = _maxBanknoteValue - cost;
+        var requestMessage = new ValuedMessage(_protocolData.Name, seller, MessageType.Payment);
+
+        var signedCost = BigInteger.Pow
+        (
+            BigInteger.Parse(_banknotes.ElementAt(banknoteIndex).Sign), //s_1 ^ (1/h)
+            ExponentHelper.ComposeExponentFromValue(change) //s_1 ^ ((1/h) * change)
+        ); //первая часть составного сообщения (ее забирает себе продавец)
+
+        _banknotes.RemoveAt(banknoteIndex); //использованную банкноту удаляю
+
+        var changeUnsigned = BankHelper.ComposeBanknote
+        (
+            _protocolData.Modulo,
+            ExponentHelper.ComposeExponentFromValue(change),
+            change
+         ); //вторая часть составного сообщения (ее продавец оправляет банку на подпись и потом отправляет покупателю в качестве сдачи)
+
+        _banknotes.Add(changeUnsigned); //сразу надо добавить в свою коллекцию банкнот
+
+        requestMessage.AddFrame(FramesNames.COST_SIGNED, signedCost.ToString());
+        requestMessage.AddFrame(FramesNames.COST_VALUE, cost);
+        requestMessage.AddFrame(FramesNames.BANKNOTE_TO_SIGN, changeUnsigned.SMultR);
+        requestMessage.AddFrame(FramesNames.BANKNOTE_TO_SIGN_VALUE, change);
+
+        MessagingHelper.SerializeThenSendMessageToServer(_socket, requestMessage);
+    }
+    private void VerifyBanknote()
+    {
+        PrintHelper.Print("Banknote index to verify: ", false);
+        var index = int.Parse(Console.ReadLine()!);
+        var banknoteToVerify = _banknotes[index];
+        if (!banknoteToVerify.IsVerified)
+        {
+            var requestMessage = new ValuedMessage(_protocolData.Name, Consts.BANK_IDENTITY, MessageType.BanknoteVerification);
+            requestMessage.AddFrame(FramesNames.BANKNOTE_TO_VERIFY, banknoteToVerify.SMultR);
+            requestMessage.AddFrame(FramesNames.SIGNED_BANKNOTE, ((BigInteger.Parse(banknoteToVerify.Sign) * BigInteger.Parse(banknoteToVerify.R)) % _protocolData.Modulo).ToString()); //верифицировать нужно с затемняющим множителем, т.к. банк сначала избавляется от него и потом подписывает S
+            requestMessage.AddFrame(FramesNames.BANKNOTE_VALUE, banknoteToVerify.Value);
+            MessagingHelper.SerializeThenSendMessageToServer(_socket, requestMessage);
+        }
+        else
+        {
+            PrintHelper.Print("Banknote already verified!", true);
+        }
+    }
+    protected virtual void HandleReceivingMessage(object sender, NetMQSocketEventArgs e)
     {
         var receivedMessage = e.Socket.ReceiveMultipartMessage();
         var message = MessagingHelper.ParseValuedMessage(receivedMessage);
@@ -166,6 +183,10 @@ internal class Client
         NetMQMessage responseMessage;
         switch (message!.Type)
         {
+            case MessageType.RegistrationInBank:
+                _maxBanknoteValue = long.Parse(message.Frames[FramesNames.MAX_BANKNOTE].ToString()!);
+                _isRegistered = true;
+                break;
             case MessageType.Modulo:
                 var modulo = BigInteger.Parse(message.Frames[FramesNames.MODULO].ToString()!);
                 _protocolData.Modulo = modulo;
@@ -177,7 +198,6 @@ internal class Client
                 {
                     _isRegistered = true;
                 }
-                _maxBanknoteValue = (long)message.Frames[FramesNames.MAX_BANKNOTE];
                 break;
             case MessageType.BanknoteResponse:
                 if (!message.Frames.ContainsKey(FramesNames.SIGNED_BANKNOTE))
@@ -186,22 +206,22 @@ internal class Client
                 }
                 else
                 {
-                    var unsignedBanknote = (string)message.Frames[FramesNames.UNSIGNED_BANKNOTE];
-                    var rawBanknote = (string)message.Frames[FramesNames.SIGNED_BANKNOTE]; //все еще с затемняющим множителем
+                    var unsignedBanknote = message.Frames[FramesNames.UNSIGNED_BANKNOTE].ToString()!;
+                    var rawBanknote = message.Frames[FramesNames.SIGNED_BANKNOTE].ToString()!; //все еще с затемняющим множителем
                     var activeBanknote = _banknotes.Find(b => b.SMultR == unsignedBanknote)!;
                     activeBanknote.Sign = (ModMath.ModDivision(BigInteger.Parse(rawBanknote), BigInteger.Parse(activeBanknote.R), _protocolData.Modulo) % _protocolData.Modulo).ToString(); //избавляюсь от затемняющего множителя
                     PrintHelper.PrintBanknotes(_banknotes);
                 }
                 break;
             case MessageType.Payment:
-                if (!message.Frames.ContainsKey(FramesNames.SIGNED_BANKNOTE))
+                if (!message.Frames.ContainsKey(FramesNames.COST_SIGNED))
                 {
-                    PrintHelper.Print("Payment message doesn't include new banknote", true);
+                    PrintHelper.Print("Payment message doesn't include signed cost", true);
                 }
                 else
                 {
-                    var banknoteSerialNumber = (string)message.Frames[FramesNames.SIGNED_BANKNOTE]; //полностью валидный серийный номер купюры
-                    var banknoteValue = (long)message.Frames[FramesNames.BANKNOTE_VALUE];
+                    var banknoteSerialNumber = message.Frames[FramesNames.COST_SIGNED].ToString()!; //полностью валидный серийный номер купюры
+                    var banknoteValue = long.Parse(message.Frames[FramesNames.COST_VALUE].ToString()!);
                     var banknote = new Banknote
                     {
                         Sign = banknoteSerialNumber,
@@ -210,6 +230,23 @@ internal class Client
                     };
                     _banknotes.Add(banknote);
                     PrintHelper.PrintBanknotes(_banknotes);
+
+                    //покупатель
+                    var buyer = message.Sender;
+                    //формирование запроса к банку на подпись сдачи
+                    var changeUnsigned = message.Frames[FramesNames.BANKNOTE_TO_SIGN];
+                    var changeValue = message.Frames[FramesNames.BANKNOTE_TO_SIGN_VALUE];
+                    var requestToSign = new ValuedMessage(_protocolData.Name, Consts.BANK_IDENTITY, MessageType.BanknoteSigning);
+                    requestToSign.AddFrame(FramesNames.BANKNOTE_TO_SIGN, changeUnsigned);
+                    requestToSign.AddFrame(FramesNames.BANKNOTE_TO_SIGN_VALUE, changeValue);
+                    MessagingHelper.SerializeThenSendMessageToServer(_socket, requestToSign);
+                    //на время подписи банкноты забираю полностью обработку сообщений
+                    var signedBanknoteMessage = MessagingHelper.ParseValuedMessage(_socket.ReceiveMultipartMessage())!;
+                    signedBanknoteMessage.Type = MessageType.BanknoteResponse;
+                    signedBanknoteMessage.Sender = _protocolData.Name;
+                    signedBanknoteMessage.Receiver = buyer;
+                    //полученную подписанную сдачу отправляю покупателю
+                    MessagingHelper.SerializeThenSendMessageToServer(_socket, signedBanknoteMessage);
                 }
                 break;
             case MessageType.BanknoteVerification:

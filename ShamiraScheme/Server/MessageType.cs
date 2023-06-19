@@ -14,5 +14,7 @@ public enum MessageType
     BanknoteRequest = 10,
     BanknoteResponse = 11,
     Payment = 12,
-    BanknoteVerification = 13
+    BanknoteVerification = 13,
+    BanknoteSigning = 14,
+    RegistrationInBank = 15
 }

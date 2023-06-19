@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "Client\Client.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SecretSharing", "shamir-secret-sharing\SecretSharing\SecretSharing.csproj", "{8C416B50-2C7D-48D0-A8C5-E19AECCF8C88}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bank", "Bank\Bank.csproj", "{95D51D39-FA99-408B-B5C7-BFE979DB543A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{8C416B50-2C7D-48D0-A8C5-E19AECCF8C88}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8C416B50-2C7D-48D0-A8C5-E19AECCF8C88}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8C416B50-2C7D-48D0-A8C5-E19AECCF8C88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95D51D39-FA99-408B-B5C7-BFE979DB543A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95D51D39-FA99-408B-B5C7-BFE979DB543A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95D51D39-FA99-408B-B5C7-BFE979DB543A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95D51D39-FA99-408B-B5C7-BFE979DB543A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

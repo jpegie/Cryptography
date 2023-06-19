@@ -4,6 +4,7 @@ using System.Dynamic;
 namespace Server;
 public static class Consts
 {
+    public const string BANK_IDENTITY = "Bank";
     public const string SERVER_IDENTITY = "Server";
     public const int VERIFICATION_ROUNDS_AMOUNT = 40;
     public const int PORT = 12346;
@@ -31,9 +32,9 @@ public static class FramesNames
     public const string UNSIGNED_BANKNOTE = "BanknoteToSign";
     public const string BANKNOTE_TO_VERIFY = "BanknoteToVerify";
     public const string SIGNED_BANKNOTE = "SignedBanknote";
-    public const string COST = "Cost";
+    public const string COST_SIGNED = "Cost";
     public const string COST_VALUE = "CostValue";
-    public const string CHANGE_TO_SIGN = "Change";
-    public const string CHANGE_VALUE = "ChangeValue";
+    public const string BANKNOTE_TO_SIGN = "Change";
+    public const string BANKNOTE_TO_SIGN_VALUE = "ChangeValue";
     public const string VERIFICATION_STATUS = "VerificationStatus";
 }

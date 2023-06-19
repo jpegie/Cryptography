@@ -1,5 +1,6 @@
 ﻿using NetMQ;
 using Newtonsoft.Json;
+using System.Net.Sockets;
 
 namespace Server.Helpers;
 public static class MessagingHelper
@@ -42,6 +43,12 @@ public static class MessagingHelper
     public static string SerializeMessage(ValuedMessage message)
     {
         return JsonConvert.SerializeObject(message);
+    }
+    public static void SerializeThenSendMessageToServer(NetMQSocket socket, ValuedMessage message)
+    {
+        var serialized = MessagingHelper.SerializeMessage(message);
+        var msgToServer = MessagingHelper.ComposeMessageToServer(serialized);
+        MessagingHelper.TrySendMessage(socket, msgToServer);
     }
 }
 
