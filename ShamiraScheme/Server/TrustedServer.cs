@@ -7,13 +7,26 @@ using System.Text.Json;
 using Newtonsoft.Json;
 using Server.Helpers;
 using SecretSharing.SecretEncryption;
+using System.Security;
 
 namespace Server;
 internal class TrustedServer
 {
+    const long CLIENT_STARTER_BALANCE = 100;
+    const long MAX_BANKNOTE_VALUE = 21; //10101 -> 13*7*3
+    /*
+     * Возможная сдача:
+     * 1) 1
+     * 2) 4
+     * 3) 16
+     * 4) 17
+     * 4) 20
+     */
     RouterSocket _socket;
     Dictionary<string, BigInteger> _registratedUsers;
+    Dictionary<string, long> _clientsBalances;
     BigInteger _modulo, _p, _q;
+    BigInteger _secretExponent;
     private int _sharesCount;
     public TrustedServer(BigInteger p, BigInteger q, string host)
     {
@@ -24,6 +37,8 @@ internal class TrustedServer
         _socket.Options.Identity = Encoding.UTF8.GetBytes(Consts.SERVER_IDENTITY);
         _socket.Options.RouterHandover = true;
         _registratedUsers = new Dictionary<string, BigInteger>();
+        _clientsBalances = new Dictionary<string, long>();
+        _secretExponent = ExponentHelper.GetExponentWithModulo(_q, _p, MAX_BANKNOTE_VALUE);
     }
     public void StartReceiving()
     {
@@ -35,16 +50,74 @@ internal class TrustedServer
         }
     }
 
+    private BigInteger SecretExponent
+    {
+        get => _secretExponent;
+    }
     private void HandleReceivingMessage(NetMQMessage message)
     {
         var clientMessage = MessagingHelper.ParseValuedMessage(message);
+        ValuedMessage? responseMessage = null;
+        BigInteger exponent = 0;
         switch (clientMessage!.Type)
         {
+            case MessageType.BanknoteVerification:
+                var sign = BigInteger.Parse(clientMessage.Frames[FramesNames.SIGNED_BANKNOTE].ToString()!);
+                var unsignedBanknote = clientMessage.Frames[FramesNames.BANKNOTE_TO_VERIFY];
+                var banknoteValue = (long)clientMessage.Frames[FramesNames.BANKNOTE_VALUE];
+                exponent = ExponentHelper.GetExponentWithModulo(_q, _p, banknoteValue);
+                var repeatedSign = SignBanknote(clientMessage, exponent);
+                var isVerified = sign == repeatedSign;
+                responseMessage = clientMessage.Clone(withFrames: false);
+                responseMessage.AddFrame(FramesNames.BANKNOTE_TO_VERIFY, unsignedBanknote);
+                responseMessage.AddFrame(FramesNames.VERIFICATION_STATUS, isVerified.ToString());
+                MessagingHelper.Response(_socket, responseMessage, responseBy: Consts.SERVER_IDENTITY);
+                break;
+            case MessageType.BanknoteRequest:
+                _clientsBalances[clientMessage.Sender] -= MAX_BANKNOTE_VALUE;
+                responseMessage = clientMessage.Clone(withFrames: true);
+                responseMessage.Type = MessageType.BanknoteResponse;
+                var signedBanknote = SignBanknote(clientMessage, _secretExponent);
+                responseMessage.AddFrame(FramesNames.SIGNED_BANKNOTE, signedBanknote.ToString());
+                responseMessage.AddFrame(FramesNames.BALANCE, _clientsBalances[clientMessage.Sender]);
+                MessagingHelper.Response(_socket, responseMessage, responseBy: Consts.SERVER_IDENTITY);
+                break;
+            case MessageType.Payment:
+                var costValue = (long)clientMessage.Frames[FramesNames.COST_VALUE];
+                var changeValue = (long)clientMessage.Frames[FramesNames.CHANGE_VALUE];
+                var costString = (string)clientMessage.Frames[FramesNames.COST]; // эту купюру нужно отправить продавцу, то есть получателю сообщения (она уже подписана)
+                var changeUnsigned = (string)clientMessage.Frames[FramesNames.CHANGE_TO_SIGN]; //эту купюру нужно подписать с помощью обратного для значения сдачи и отправить покупателю, то есть отправителю сообщения
+                
+                _clientsBalances[clientMessage.Sender] += changeValue;
+                _clientsBalances[clientMessage.Receiver] += costValue;
+
+                exponent = ExponentHelper.GetExponentWithModulo(_q, _p, changeValue);
+                var changeSigned = SignBanknote(clientMessage, exponent);
+
+                responseMessage = clientMessage.Clone(withFrames: false);
+                responseMessage.Type = MessageType.BanknoteResponse;
+                responseMessage.AddFrame(FramesNames.UNSIGNED_BANKNOTE, changeUnsigned.ToString());
+                responseMessage.AddFrame(FramesNames.SIGNED_BANKNOTE, changeSigned.ToString());
+                responseMessage.AddFrame(FramesNames.BALANCE, _clientsBalances[clientMessage.Sender]);
+                MessagingHelper.Response(_socket, responseMessage, responseBy: Consts.SERVER_IDENTITY);
+
+                var messageToSeller = new ValuedMessage(clientMessage.Sender, clientMessage.Receiver, MessageType.Payment);
+                messageToSeller.AddFrame(FramesNames.SIGNED_BANKNOTE, costString);
+                messageToSeller.AddFrame(FramesNames.BANKNOTE_VALUE, costValue);
+                messageToSeller.AddFrame(FramesNames.BALANCE, _clientsBalances[clientMessage.Receiver]);
+                //отправка денег продавцу 
+                var msg = MessagingHelper.ComposeMessage(
+                    messageToSeller.Receiver,
+                    MessagingHelper.SerializeMessage(messageToSeller));
+                MessagingHelper.TrySendMessage(_socket, msg);
+
+                break;
+
             case MessageType.Registration:
                 RegisterClient(clientMessage);
                 break;
             case MessageType.Modulo:
-                var responseMessage = clientMessage.Clone(withFrames: false);
+                responseMessage = clientMessage.Clone(withFrames: false);
                 responseMessage.AddFrame(FramesNames.MODULO, _modulo);
                 MessagingHelper.Response(_socket, responseMessage, responseBy: Consts.SERVER_IDENTITY);
                 break;
@@ -133,6 +206,24 @@ internal class TrustedServer
         return Encryption.Decrypt(dataToDecrypt, hexKey);
     }
 
+    private BigInteger SignBanknote(ValuedMessage message, BigInteger exponent)
+    {
+        var signingFrames = new string[]
+        {
+            FramesNames.BANKNOTE_TO_VERIFY,
+            FramesNames.UNSIGNED_BANKNOTE,
+            FramesNames.CHANGE_TO_SIGN
+        };
+        var signingFrame = signingFrames
+            .Select(f => f)
+            .Where(f => message.Frames.ContainsKey(f))
+            .First();
+
+        var banknoteToSignString = (string)message.Frames[signingFrame];
+        var banknoteToSign = BigInteger.Parse(banknoteToSignString);
+        var signedBanknote = BankHelper.SignBanknote(banknoteToSign, exponent, _modulo);
+        return signedBanknote;
+    }
     private void ShareKeys(ushort[] key, int players, int required)
     {
         var splitted = SharesManager.SplitKey(key, players, required);
@@ -208,8 +299,13 @@ internal class TrustedServer
     public void RegisterClient(ValuedMessage message)
     {
         if (!_registratedUsers.ContainsKey(message.Sender))
+        {
             _registratedUsers.Add(message.Sender, BigInteger.Parse(message.Frames[FramesNames.PUBLIC_KEY].ToString()!));
+            _clientsBalances.Add(message.Sender, CLIENT_STARTER_BALANCE);
+        } 
         message.AddFrame(FramesNames.STATUS, "Registration completed");
+        message.AddFrame(FramesNames.BALANCE, _clientsBalances[message.Sender]);
+        message.AddFrame(FramesNames.MAX_BANKNOTE, MAX_BANKNOTE_VALUE);
         MessagingHelper.Response(_socket, message, responseBy: Consts.SERVER_IDENTITY);
     }
 }

@@ -10,5 +10,9 @@ public enum MessageType
     KeyDelivery = 6,
     KeyResponse = 7,
     Encrypt = 8,
-    Decrypt = 9
+    Decrypt = 9,
+    BanknoteRequest = 10,
+    BanknoteResponse = 11,
+    Payment = 12,
+    BanknoteVerification = 13
 }

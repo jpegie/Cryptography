@@ -1,4 +1,5 @@
-﻿using System.Dynamic;
+﻿using Newtonsoft.Json.Serialization;
+using System.Dynamic;
 
 namespace Server;
 public static class Consts
@@ -23,4 +24,16 @@ public static class FramesNames
     public const string Key = "Key";
     public const string Players = "Players";
     public const string Required = "Required";
+    public const string BALANCE = "Balance";
+    public const string MAX_BANKNOTE = "MaxBanknote";
+    public const string BANKNOTE = "Banknote";
+    public const string BANKNOTE_VALUE = "BanknoteValue";
+    public const string UNSIGNED_BANKNOTE = "BanknoteToSign";
+    public const string BANKNOTE_TO_VERIFY = "BanknoteToVerify";
+    public const string SIGNED_BANKNOTE = "SignedBanknote";
+    public const string COST = "Cost";
+    public const string COST_VALUE = "CostValue";
+    public const string CHANGE_TO_SIGN = "Change";
+    public const string CHANGE_VALUE = "ChangeValue";
+    public const string VERIFICATION_STATUS = "VerificationStatus";
 }
