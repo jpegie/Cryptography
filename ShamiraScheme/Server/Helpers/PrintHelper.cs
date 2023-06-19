@@ -16,10 +16,13 @@ public static class PrintHelper
         lock (printLock)
         {
             var msgToPrint = "";
-            msgToPrint += msgToPrint.Length == 0 && cutLenth ? "" : "...";
             if (cutLenth)
             {
-                msgToPrint = String.Join("", message.Take(MAX_PRINTING_CHARS).ToList()) + "...";
+                msgToPrint = String.Join("", message.Take(MAX_PRINTING_CHARS).ToList());
+                if (message.Length > MAX_PRINTING_CHARS)
+                {
+                    msgToPrint += "...";
+                }
             }
             else
             {
@@ -51,10 +54,10 @@ public static class PrintHelper
         Print("\nCurrent banknotes list: ", true);
         foreach(var b in banknotes)
         {
-            Print($"{i}) value = {b.Value}, ", false);
-            Print($"sign = {b.Sign}, ", false, true);
-            Print($"s*r = {b.SMultR}, ", false, true);
-            Print($"s = {b.S}, ", false, true);
+            Print($"{i}) value = {b.Value}", false);
+            Print($"sign = {b.Sign}", false, true);
+            Print($"s*r = {b.SMultR}", false, true);
+            Print($"s = {b.S}", false, true);
             Print($"r = {b.R}", true, true);
             i++;
         }
